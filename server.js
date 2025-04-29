@@ -8,6 +8,7 @@ const morgan = require('morgan');
 const rateLimit = require('./middlewares/ratelimiter');
 const ipBlocker = require('./middlewares/ipblocker');
 require('dotenv').config();
+const tradingRoutes = require('./routes/trading.routes');
 
 const app = express();
 const server = http.createServer(app);
