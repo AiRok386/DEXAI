@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const tradingController = require('../controllers/trading.controller');
+const tradingController = require('../controllers/trade.controller');
 const { protectUser } = require('../middlewares/auth.middleware');
 
 // ⭐ Place Order
