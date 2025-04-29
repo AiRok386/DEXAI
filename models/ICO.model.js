@@ -11,8 +11,6 @@ const ICOSchema = new mongoose.Schema({
     status: { type: String, enum: ['upcoming', 'live', 'ended'], default: 'upcoming' }
 });
 
-module.exports = mongoose.model('ICO', ICOSchema);
-const mongoose = require('mongoose');
 
 const icoSchema = new mongoose.Schema({
     projectName: { type: String, required: true }, // Name of the ICO project
