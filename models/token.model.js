@@ -1,13 +1,6 @@
 const mongoose = require('mongoose');
 
-// ⭐ Token schema
-const TokenSchema = new mongoose.Schema({
-    symbol: { type: String, required: true, unique: true },
-    name: { type: String, required: true },
-    contractAddress: { type: String },
-    decimals: { type: Number, default: 18 },
-    listed: { type: Boolean, default: false }
-});
+
 
 const tokenSchema = new mongoose.Schema({
     name: { type: String, required: true }, // Full name (e.g., Bitcoin)
