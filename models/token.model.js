@@ -9,9 +9,6 @@ const TokenSchema = new mongoose.Schema({
     listed: { type: Boolean, default: false }
 });
 
-module.exports = mongoose.model('Token', TokenSchema);
-const mongoose = require('mongoose');
-
 const tokenSchema = new mongoose.Schema({
     name: { type: String, required: true }, // Full name (e.g., Bitcoin)
     symbol: { type: String, required: true }, // Symbol (e.g., BTC)
@@ -23,3 +20,4 @@ const tokenSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 module.exports = mongoose.model('Token', tokenSchema);
+
