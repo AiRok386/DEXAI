@@ -11,8 +11,6 @@ const OrderSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Order', OrderSchema);
-const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Linked to user
