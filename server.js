@@ -8,7 +8,7 @@ const morgan = require('morgan');
 const rateLimit = require('./middlewares/ratelimiter');
 const ipBlocker = require('./middlewares/ipblocker');
 require('dotenv').config();
-const tradingRoutes = require('./routes/trading.routes');
+const tradingRoutes = require('./routes/trade.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -34,7 +34,7 @@ app.use(morgan('combined'));
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/user', require('./routes/user.routes'));
 app.use('/api/wallet', require('./routes/wallet.routes'));
-app.use('/api/trading', require('./routes/trading.routes'));
+app.use('/api/trading', require('./routes/trade.routes'));
 app.use('/api/tokens', require('./routes/token.routes'));
 app.use('/api/ico', require('./routes/ico.routes'));
 app.use('/api/trades', require('./routes/trades'));
