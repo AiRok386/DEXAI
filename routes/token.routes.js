@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const tokenController = require('../controllers/token.controller');
-const { protectUser } = require('../middlewares/auth.middleware');
+const { protectAdmin } = require('../middlewares/auth.middleware');
 
 // ⭐ Admin Routes
 router.post('/admin/token', protectAdmin, tokenController.createToken); // Create
