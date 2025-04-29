@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const icoController = require('../controllers/ico.controller');
-const { protect, protectAdmin } = require('../middlewares/auth.Middleware');
+const { protect, protectAdmin } = require('../middlewares/auth.middleware');
 
 // ⭐ Admin Routes
 router.post('/admin/ico', protectAdmin, icoController.createICO);
