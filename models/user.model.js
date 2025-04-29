@@ -1,39 +1,27 @@
 const mongoose = require('mongoose');
 
-// ⭐ User schema
-const UserSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    kycStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
-    isFrozen: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now }
-});
-
-module.exports = mongoose.model('User', UserSchema); // ⭐ Export model
-
-
+// ⭐ User Schema Definition
 const userSchema = new mongoose.Schema({
-    username: { type: String, required: true },
+    username: { type: String, required: true, unique: true },
     email:    { type: String, required: true, unique: true },
     password: { type: String, required: true },
 
-    // ⭐ Profile Information
+    // ⭐ Optional Profile Info
     phone:        { type: String },
     address:      { type: String },
     country:      { type: String },
-    profileImage: { type: String }, // profile pic (optional)
+    profileImage: { type: String }, // URL to profile pic
 
-    // ⭐ KYC Section
+    // ⭐ KYC Info
     kycStatus: {
         type: String,
         enum: ['pending', 'approved', 'rejected'],
         default: 'pending'
     },
     kycDocuments: {
-        idCardFront: { type: String }, // Front side image URL
-        idCardBack:  { type: String }, // Back side image URL
-        selfieWithId: { type: String } // Selfie with ID card
+        idCardFront:  { type: String },
+        idCardBack:   { type: String },
+        selfieWithId: { type: String }
     },
 
     // ⭐ Account Status
@@ -44,4 +32,5 @@ const userSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-module.exports = mongoose.model('User', userSchema);
+// ✅ Safe export: prevent OverwriteModelError
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);
