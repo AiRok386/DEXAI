@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const walletController = require('../controllers/wallet.controller');
-const { protectUser, protectAdmin } = require('../middlewares/authMiddleware');
+const { protectUser, protectAdmin } = require('../middlewares/auth.middleware');
 
 // ⭐ User Wallet
 router.get('/', protectUser, walletController.getWallet);
