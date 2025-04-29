@@ -1,4 +1,4 @@
-const Token = require('../models/Token.model');
+const Token = require('../models/token.model');
 
 // ⭐ Admin Create New Token
 exports.createToken = async (req, res) => {
