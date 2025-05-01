@@ -70,4 +70,7 @@ startServer();
 
 const botRoutes = require('./routes/bot.routes');
 app.use('/api/bots', botRoutes);
+const botRoutes = require('./routes/admin/bots'); // Adjust to your file path
+app.use('/api/admin/bots', botRoutes);
+
 
