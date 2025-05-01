@@ -1,7 +1,7 @@
-// ✅ middlewares/adminAuthMiddleware.js
+// ✅ middlewares/adminMiddleware.js
 const jwt = require('jsonwebtoken');
 
-function adminAuthMiddleware(req, res, next) {
+function adminMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
     return res.status(401).json({ message: 'No token provided.' });
@@ -19,4 +19,4 @@ function adminAuthMiddleware(req, res, next) {
   }
 }
 
-module.exports = adminAuthMiddleware; // ✅ not inside an object!
+module.exports = adminMiddleware; // ✅ not inside an object!
