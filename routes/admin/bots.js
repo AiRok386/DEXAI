@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const { startBot, stopBot } = require('../../bots/marketMakerBot');
-const adminAuthMiddleware = require('../../middlewares/auth.middleware');
+const adminAuthMiddleware = require('../../middlewares/adminAuthMiddleware');
 
 // Ensure middleware is a function
 if (typeof adminAuthMiddleware !== 'function') {
