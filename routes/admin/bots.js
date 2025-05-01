@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { startBot, stopBot } = require('../../bots/marketMakerBot');
-const { adminAuthMiddleware } = require('../../middlewares/authMiddleware');
+const { adminAuthMiddleware } = require('../../middlewares/auth.middleware');
 
 // Track bot status
 let botRunning = false;
