@@ -18,5 +18,15 @@ function adminMiddleware(req, res, next) {
     return res.status(401).json({ message: 'Invalid or expired token.' });
   }
 }
+const protectAdmin = (req, res, next) => {
+  // Check if user is admin
+  if (req.user && req.user.role === 'admin') {
+    next(); // Continue to the next middleware/route handler
+  } else {
+    res.status(403).send('Forbidden: Admin access required');
+  }
+};
+
+module.exports = { protectAdmin };
 
 module.exports = adminMiddleware; // ✅ not inside an object!
