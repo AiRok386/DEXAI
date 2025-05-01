@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const icoController = require('../controllers/ico.controller');
-const { protect, protectAdmin } = require('../middlewares/auth.middleware');
+const { protectUser, protectAdmin } = require('../middlewares/auth.middleware');
 
 // Admin Routes
 router.post('/admin/ico', protectAdmin, icoController.createICO);
@@ -12,6 +12,6 @@ router.delete('/admin/ico/:id', protectAdmin, icoController.deleteICO);
 router.get('/icos', icoController.getLiveICOs);
 
 // User Routes
-router.post('/ico/buy', protect, icoController.buyICO);
+router.post('/ico/buy', protectUser, icoController.buyICO);
 
 module.exports = router;
