@@ -67,3 +67,7 @@ async function startServer() {
 }
 
 startServer();
+
+const botRoutes = require('./routes/bot.routes');
+app.use('/api/bots', botRoutes);
+
