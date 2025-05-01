@@ -1,7 +1,7 @@
 const User = require('../models/user.model');
 
 // ⭐ Fetch User Info
-exports.getUserInfo = async (req, res) => {
+const getUserInfo = async (req, res) => {
     try {
         const user = await User.findById(req.user.userId).select('-password');
         res.status(200).json(user);
@@ -11,7 +11,7 @@ exports.getUserInfo = async (req, res) => {
 };
 
 // ⭐ Update Profile
-exports.updateProfile = async (req, res) => {
+const updateProfile = async (req, res) => {
     try {
         const { phone, address, country } = req.body;
         const updatedUser = await User.findByIdAndUpdate(
@@ -27,7 +27,7 @@ exports.updateProfile = async (req, res) => {
 };
 
 // ⭐ Submit KYC
-exports.submitKyc = async (req, res) => {
+const submitKyc = async (req, res) => {
     try {
         const { idCardFront, idCardBack, selfieWithId } = req.body;
         const updatedUser = await User.findByIdAndUpdate(
@@ -46,7 +46,7 @@ exports.submitKyc = async (req, res) => {
 };
 
 // ⭐ Admin: Approve or Reject KYC
-exports.adminKycAction = async (req, res) => {
+const adminKycAction = async (req, res) => {
     try {
         const { userId, action } = req.body;
 
@@ -64,4 +64,12 @@ exports.adminKycAction = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
+};
+
+// ✅ Properly Export All Functions
+module.exports = {
+    getUserInfo,
+    updateProfile,
+    submitKyc,
+    adminKycAction
 };
