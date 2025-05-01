@@ -1,6 +1,6 @@
 // ✅ bots/marketMakerBot.js
 const Order = require('../models/Order.model');
-const Token = require('../models/Token');
+const Token = require('../models/token.model');
 const randomFloat = require('../utils/randomFloat');
 
 const SPREAD_PERCENT = 0.5;
