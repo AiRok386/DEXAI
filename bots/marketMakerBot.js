@@ -1,5 +1,5 @@
 // ✅ bots/marketMakerBot.js
-const Order = require('../models/Order');
+const Order = require('../models/Order.model');
 const Token = require('../models/Token');
 const randomFloat = require('../utils/randomFloat');
 
