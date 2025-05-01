@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
-const { protectUser, protectAdmin } = require('../middlewares/auth.middleware');
+const { protectUser, protectAdmin } = require('../middlewares/auth.middleware');  // Ensure correct import
 
 // ⭐ Fetch User Info (User must login)
 router.get('/profile', protectUser, userController.getUserInfo);
