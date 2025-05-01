@@ -77,10 +77,29 @@ exports.matchOrders = async (tokenSymbol) => {
                     await sellOrder.save();
 
                     // TODO: Update user wallets here (credit tokens after match)
+                    await updateWallets(buyOrder, sellOrder, matchAmount); // Call wallet update after matching
                 }
             }
         }
     } catch (error) {
         console.error('Matching Engine Error:', error.message);
+    }
+};
+
+// Function to update wallets (placeholder logic)
+const updateWallets = async (buyOrder, sellOrder, matchAmount) => {
+    try {
+        // Assuming Wallet model exists and has necessary methods
+        const buyerWallet = await Wallet.findOne({ userId: buyOrder.userId, tokenSymbol: buyOrder.tokenSymbol });
+        const sellerWallet = await Wallet.findOne({ userId: sellOrder.userId, tokenSymbol: sellOrder.tokenSymbol });
+
+        if (buyerWallet && sellerWallet) {
+            buyerWallet.balance -= matchAmount; // Deduct from buyer
+            sellerWallet.balance += matchAmount; // Add to seller
+            await buyerWallet.save();
+            await sellerWallet.save();
+        }
+    } catch (error) {
+        console.error('Error updating wallets:', error.message);
     }
 };
