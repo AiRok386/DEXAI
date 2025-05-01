@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
 // ✅ Middleware: Protect user routes
-exports.protect = (req, res, next) => {
+exports.protectUser = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
 
     if (!token) {
@@ -36,6 +36,3 @@ exports.protectAdmin = (req, res, next) => {
         return res.status(401).json({ message: 'Invalid or expired token.' });
     }
 };
-
-
-
