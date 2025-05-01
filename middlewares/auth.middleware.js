@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
 // ✅ Middleware: Protect user routes
-exports.protectUser = (req, res, next) => {
+exports.protect = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
 
     if (!token) {
