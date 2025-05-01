@@ -5,7 +5,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('./middlewares/ratelimiter');
 const ipBlocker = require('./middlewares/ipblocker');
-require('dotenv').config();
+require('dotenv').config();  // This should not be causing issues
 const tradingRoutes = require('./routes/trade.routes');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
@@ -30,7 +30,7 @@ global.io = io;
 app.set('io', io);
 
 // ✅ MongoDB connection
-dbConnect();
+dbConnect();  // If dbConnect() is asynchronous, ensure it's properly handled
 
 // ✅ Middlewares
 app.use(cors());
@@ -64,7 +64,7 @@ io.on('connection', (socket) => {
 startBot();
 
 // ✅ Start Binance stream mirroring
-require('./services/binanceMultiStream');
+require('./services/binanceMultiStream');  // Ensure this file doesn't have top-level await
 
 // ✅ Start server
 const PORT = process.env.PORT || 3000;
