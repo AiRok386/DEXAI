@@ -36,3 +36,10 @@ exports.protectAdmin = (req, res, next) => {
         return res.status(401).json({ message: 'Invalid or expired token.' });
     }
 };
+function adminAuthMiddleware(req, res, next) {
+    // your auth logic
+    next();
+}
+
+module.exports = adminAuthMiddleware;
+// ✅ NOT: exports.adminAuthMiddleware = ...
