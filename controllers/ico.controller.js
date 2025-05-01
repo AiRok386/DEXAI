@@ -2,7 +2,7 @@ const ICO = require('../models/ICO.model');
 const ICOPurchase = require('../models/IcoPurchase.model');
 
 // ⭐ Admin: Create ICO
-exports.createICO = async (req, res) => {
+const createICO = async (req, res) => {
     try {
         const ico = new ICO(req.body);
         await ico.save();
@@ -13,7 +13,7 @@ exports.createICO = async (req, res) => {
 };
 
 // ⭐ Admin: Edit ICO
-exports.updateICO = async (req, res) => {
+const updateICO = async (req, res) => {
     try {
         const ico = await ICO.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!ico) return res.status(404).json({ message: 'ICO not found' });
@@ -24,7 +24,7 @@ exports.updateICO = async (req, res) => {
 };
 
 // ⭐ Admin: Delete ICO
-exports.deleteICO = async (req, res) => {
+const deleteICO = async (req, res) => {
     try {
         await ICO.findByIdAndDelete(req.params.id);
         res.status(200).json({ message: 'ICO deleted' });
@@ -34,7 +34,7 @@ exports.deleteICO = async (req, res) => {
 };
 
 // ⭐ Public: Get all Live ICOs
-exports.getLiveICOs = async (req, res) => {
+const getLiveICOs = async (req, res) => {
     try {
         const icos = await ICO.find({ status: 'live' });
         res.status(200).json(icos);
@@ -44,22 +44,22 @@ exports.getLiveICOs = async (req, res) => {
 };
 
 // ⭐ User: Participate in ICO
-exports.buyICO = async (req, res) => {
+const buyICO = async (req, res) => {
     try {
         const { icoId, amountUSD } = req.body;
-        const userId = req.user.id; // Authenticated user
+        const userId = req.user.id;
 
         const ico = await ICO.findById(icoId);
         if (!ico) return res.status(404).json({ message: 'ICO not found' });
 
-        const tokensBought = amountUSD / ico.pricePerToken; // Calculate tokens
-        
+        const tokensBought = amountUSD / ico.pricePerToken;
+
         const purchase = new ICOPurchase({
             userId,
             icoId,
             amountUSD,
             tokensBought,
-            status: 'pending' // (you can implement payment confirmation later)
+            status: 'pending'
         });
 
         await purchase.save();
@@ -67,4 +67,13 @@ exports.buyICO = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
+};
+
+// ✅ Export all handlers
+module.exports = {
+    createICO,
+    updateICO,
+    deleteICO,
+    getLiveICOs,
+    buyICO
 };
