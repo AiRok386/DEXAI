@@ -29,4 +29,3 @@ const protectAdmin = (req, res, next) => {
 
 module.exports = { protectAdmin };
 
-module.exports = adminMiddleware; // ✅ not inside an object!
