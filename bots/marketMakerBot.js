@@ -1,6 +1,7 @@
 const Order = require('../models/Order.model');
 const Token = require('../models/token.model');
 const randomFloat = require('../utils/randomFloat');
+const fetchCoinCapPrice = require('../utils/fetchCoinCapPrice'); // ✅ Import new utility
 
 const SPREAD_PERCENT = 0.5; // % spread between buy/sell
 const MIN_ORDER_AMOUNT = 0.01;
@@ -18,7 +19,11 @@ async function runMarketMaker() {
     const tokens = await Token.find({ active: true });
 
     for (const token of tokens) {
-      const basePrice = token.currentPrice;
+      const symbol = token.symbol.toLowerCase(); // e.g., 'btc' -> 'bitcoin'
+      const coinCapId = getCoinCapId(symbol); // Convert symbol to CoinCap ID
+      if (!coinCapId) continue;
+
+      const basePrice = await fetchCoinCapPrice(coinCapId);
       if (!basePrice) continue;
 
       // Buy order
@@ -47,11 +52,24 @@ async function runMarketMaker() {
         status: 'open',
       });
 
-      console.log(`📈 Bot placed Buy/Sell orders for ${token.symbol}`);
+      console.log(`📈 Bot placed Buy/Sell orders for ${token.symbol} at ${basePrice}`);
     }
   } catch (err) {
     console.error('❌ Market Maker Bot Error:', err);
   }
+}
+
+// ✅ Converts token symbols to CoinCap IDs
+function getCoinCapId(symbol) {
+  const map = {
+    btc: 'bitcoin',
+    eth: 'ethereum',
+    usdt: 'tether',
+    bnb: 'binance-coin',
+    sol: 'solana',
+    // Add more mappings here as needed
+  };
+  return map[symbol] || null;
 }
 
 // ✅ Start the bot
