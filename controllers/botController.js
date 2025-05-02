@@ -1,10 +1,24 @@
+const axios = require('axios');
 const User = require('../models/User');
 const Trade = require('../models/Trade'); // Assuming you have a Trade model
-const { generateRandomPrice } = require('../utils/crypto.util');
-const { broadcastTrade } = require('../utils/websocket.util');
+const { generateRandomPrice } = require('../utils/crypto.util'); // Can be removed if you no longer need random price generation
 
 // In-memory bot list (in production, store in DB or cache)
 const activeBots = new Map();
+
+// CoinCap API URL
+const COINCAP_API_URL = 'https://api.coincap.io/v2/assets';
+
+// Function to get live price from CoinCap API
+const getLivePrice = async (assetId) => {
+    try {
+        const response = await axios.get(`${COINCAP_API_URL}/${assetId}`);
+        return response.data.data.priceUsd; // Assuming you're getting price in USD
+    } catch (error) {
+        console.error('Error fetching live price:', error);
+        return null;
+    }
+};
 
 /**
  * Start a trading bot
@@ -22,7 +36,13 @@ exports.startBot = async (req, res) => {
 
     const botId = setInterval(async () => {
         try {
-            const price = generateRandomPrice(pair);
+            // Get the live price for the pair from CoinCap API
+            const price = await getLivePrice(pair);
+            if (!price) {
+                console.log(`[Bot] ${pair}: Failed to fetch live price`);
+                return;
+            }
+
             const trade = new Trade({
                 pair,
                 price,
@@ -32,9 +52,10 @@ exports.startBot = async (req, res) => {
             });
             await trade.save();
 
-            // Broadcast to clients
-            broadcastTrade(trade);
+            // Here you can broadcast the trade to a client or log it
+            // For now, we'll just log the trade to the console
             console.log(`[Bot] ${pair}: Executed simulated trade @ ${price}`);
+
         } catch (err) {
             console.error(`[Bot] ${pair}: Error simulating trade`, err);
         }
