@@ -5,7 +5,7 @@ require('dotenv').config();
 
 // Base URL for CoinCap v3 API
 const BASE_URL = 'https://rest.coincap.io/v3';
-onst API_KEY = process.env.COINCAP_API_KEY; // ✅ This is correct
+const API_KEY = process.env.COINCAP_API_KEY; // ✅ This is correct
 // Create an Axios instance with optional API key in headers
 const api = axios.create({
   baseURL: BASE_URL,
