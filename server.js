@@ -26,8 +26,6 @@ const io = new Server(server, { cors: { origin: '*' } });
 const { startBot } = require('./bots/marketMakerBot');
 const { startPriceUpdater } = require('./utils/priceUpdater');
 
-...
-
 mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log('✅ MongoDB connected successfully.');
   startPriceUpdater(); // ✅ Start fetching prices
