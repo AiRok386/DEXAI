@@ -22,6 +22,8 @@ const adminBotRoutes = require('./routes/admin/bots');
 const dbConnect = require('./config/db.config');
 
 const app = express();
+// Enable the trust proxy setting for handling forwarded headers
+app.set('trust proxy', 1); // Trust the first proxy (most cases, this is enough)
 const PORT = process.env.PORT || 5000;
 
 // Connect to DB
