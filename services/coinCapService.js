@@ -1,4 +1,13 @@
 const axios = require('axios');
+async function fetchMarketData() {
+    const url = 'https://api.coincap.io/v2/assets'; // No API key needed
+    const response = await axios.get(url);
+    return response.data.data;
+  }
+  
+  module.exports = {
+    fetchMarketData
+  };
 require('dotenv').config();
 
 const BASE_URL = 'https://api.coincap.io/v2';
