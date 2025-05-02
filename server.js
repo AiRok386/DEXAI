@@ -1,8 +1,7 @@
-// ✅ server.js
 const express = require('express');
 const connectDB = require('./config/db.config.js');
 const priceRoutes = require('./routes/price.routes');
-const startScheduler = require('./utils/scheduler');
+const startScheduler = require('./utils/scheduler').startScheduler;  // Correctly import startScheduler
 const http = require('http');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -24,73 +23,73 @@ const dbConnect = require('./config/db.config');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
 // Connect to DB
 connectDB();
+
+// Create server
 const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server, { cors: { origin: '*' } });
+
+// Import bots and price update functions
 const { startBot } = require('./bots/marketMakerBot');
 const { startPriceUpdater } = require('./utils/priceUpdater');
 
-mongoose.connect(process.env.MONGO_URI).then(() => {
-  console.log('✅ MongoDB connected successfully.');
-  startPriceUpdater(); // ✅ Start fetching prices
-  startBot();          // ✅ Start the market maker bot
-  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-});
+// Middleware setup
+app.use(express.json());
+app.use(cors());
+app.use(rateLimit);
+app.use(ipBlocker);
+app.use(morgan('combined'));
 
+// API routes
+app.use('/api', priceRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/trading', tradingRoutes);
+app.use('/api/tokens', tokenRoutes);
+app.use('/api/ico', icoRoutes);
+app.use('/api/trades', tradesRoutes);
+app.use('/api/orderbook', orderbookRoutes);
+app.use('/api/candles', candlesRoutes);
+app.use('/admin/bots', adminBotRoutes);
+const botRoutes = require('./routes/bot.routes');
+app.use('/api/bots', botRoutes);
+const marketRoutes = require('./routes/market.routes');
+app.use('/api/markets', marketRoutes);
 
 // Make io globally available
 app.set('io', io);
 global.io = io;
 
-// ✅ Wrap everything in async function to handle top-level await
+// Handle client socket connections
+io.on('connection', (socket) => {
+  console.log('🛜 Client connected:', socket.id);
+  socket.on('disconnect', () => {
+    console.log('❌ Client disconnected:', socket.id);
+  });
+});
+
+// Start the server after DB connection
 async function startServer() {
-  await dbConnect();
+  try {
+    await dbConnect();
+    console.log('✅ MongoDB connected successfully.');
 
-  // Middleware
+    // Start price updater, bot, and scheduler
+    startPriceUpdater();  // Start the price updater for fetching prices
+    startBot();           // Start the market maker bot
+    startScheduler();     // Start the scheduler for CoinCap data fetching
 
-  
-  app.use(express.json());
-  app.use('/api', priceRoutes);
-  
-  // Scheduler to fetch from CoinCap
-startScheduler();
-  app.use(cors());
-  app.use(rateLimit);
-  app.use(ipBlocker);
-  app.use(morgan('combined'));
-
-  app.use('/api/auth', authRoutes);
-  app.use('/api/user', userRoutes);
-  app.use('/api/wallet', walletRoutes);
-  app.use('/api/trading', tradingRoutes);
-  app.use('/api/tokens', tokenRoutes);
-  app.use('/api/ico', icoRoutes);
-  app.use('/api/trades', tradesRoutes);
-  app.use('/api/orderbook', orderbookRoutes);
-  app.use('/api/candles', candlesRoutes);
-  app.use('/admin/bots', adminBotRoutes);
-
-  io.on('connection', (socket) => {
-    console.log('🛜 Client connected:', socket.id);
-    socket.on('disconnect', () => {
-      console.log('❌ Client disconnected:', socket.id);
+    // Start server
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
     });
-  });
-
-  startBot();
-  require('./services/binanceMultiStream');
-
-  const PORT = process.env.PORT || 3000;
-  server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-  });
+  } catch (error) {
+    console.error('❌ Error starting server:', error);
+  }
 }
 
 startServer();
-
-const botRoutes = require('./routes/bot.routes');
-app.use('/api/bots', botRoutes);
-const marketRoutes = require('./routes/market.routes');
-app.use('/api/markets', marketRoutes);
