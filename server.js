@@ -24,6 +24,18 @@ const app = express();
 const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server, { cors: { origin: '*' } });
+const { startBot } = require('./bots/marketMakerBot');
+const { startPriceUpdater } = require('./utils/priceUpdater');
+
+...
+
+mongoose.connect(process.env.MONGO_URI).then(() => {
+  console.log('✅ MongoDB connected successfully.');
+  startPriceUpdater(); // ✅ Start fetching prices
+  startBot();          // ✅ Start the market maker bot
+  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+});
+
 
 // Make io globally available
 app.set('io', io);
