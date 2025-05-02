@@ -3,9 +3,11 @@
 const axios = require('axios');
 require('dotenv').config();
 
-const BASE_URL = 'https://api.coincap.io/v2';
-const API_KEY = process.env.COINCAP_API_KEY;
+// Base URL for CoinCap v3 API
+const BASE_URL = 'https://rest.coincap.io/v3';
+const API_KEY = process.env.COINCAP_API_KEY; // Optional API key, set in .env file
 
+// Create an Axios instance with optional API key in headers
 const api = axios.create({
   baseURL: BASE_URL,
   headers: API_KEY ? { Authorization: `Bearer ${API_KEY}` } : {}
@@ -24,8 +26,9 @@ async function retryRequest(func, retries = 3) {
       return await func();
     } catch (err) {
       if (err.response?.status === 429) {
-        console.log(`[Retry] Rate limit hit, retrying...`);
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000)); // Exponential backoff
+        console.log(`[Retry] Rate limit hit, retrying... Attempt ${attempts + 1}`);
+        const delay = Math.pow(2, attempts) * 1000; // Exponential backoff (e.g., 1, 2, 4, 8 seconds)
+        await new Promise(resolve => setTimeout(resolve, delay));
         attempts++;
       } else {
         throw err;
@@ -72,12 +75,12 @@ async function fetchSingleAsset(symbol = 'bitcoin') {
  */
 function simulateOrderBook(price) {
   const bids = Array.from({ length: 5 }, (_, i) => [
-    (price - i * 10).toFixed(2),
-    (Math.random() * 5).toFixed(4)
+    (price - i * 10).toFixed(2), // Simulating bid prices lower than the current price
+    (Math.random() * 5).toFixed(4) // Random quantity for bid
   ]);
   const asks = Array.from({ length: 5 }, (_, i) => [
-    (price + i * 10).toFixed(2),
-    (Math.random() * 5).toFixed(4)
+    (price + i * 10).toFixed(2), // Simulating ask prices higher than the current price
+    (Math.random() * 5).toFixed(4) // Random quantity for ask
   ]);
   return { bids, asks };
 }
