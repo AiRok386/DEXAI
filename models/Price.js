@@ -1,12 +1,11 @@
 const mongoose = require('mongoose');
 
 const priceSchema = new mongoose.Schema({
-  symbol: { type: String, unique: true },
+  symbol: String,
+  name: String,
   price: Number,
   volume: Number,
-  high: Number,
-  low: Number,
-  change: Number,
+  changePercent24Hr: Number,
   updatedAt: Date
 });
 
