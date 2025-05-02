@@ -1,6 +1,6 @@
 const axios = require('axios');
 async function fetchMarketData() {
-    const url = 'https://api.coincap.io/v2/assets'; // No API key needed
+    const url = 'https://rest.coincap.io/v3/assets?apiKey=6ba0e905908d943ad0aca41ffcd74342947025973e52a82c670373f38eccbabe'; // No API key needed
     const response = await axios.get(url);
     return response.data.data;
   }
