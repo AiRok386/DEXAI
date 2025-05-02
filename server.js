@@ -92,3 +92,5 @@ startServer();
 
 const botRoutes = require('./routes/bot.routes');
 app.use('/api/bots', botRoutes);
+const { startScheduler } = require('./utils/scheduler');
+startScheduler();
