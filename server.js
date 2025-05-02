@@ -94,3 +94,5 @@ const botRoutes = require('./routes/bot.routes');
 app.use('/api/bots', botRoutes);
 const { startScheduler } = require('./utils/scheduler');
 startScheduler();
+const marketRoutes = require('./routes/market.routes');
+app.use('/api/markets', marketRoutes);
