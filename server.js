@@ -1,5 +1,8 @@
 // ✅ server.js
 const express = require('express');
+const connectDB = require('./config/db');
+const priceRoutes = require('./routes/price.routes');
+const startScheduler = require('./utils/scheduler');
 const http = require('http');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -20,6 +23,9 @@ const adminBotRoutes = require('./routes/admin/bots');
 const dbConnect = require('./config/db.config');
 
 const app = express();
+const PORT = process.env.PORT || 5000;
+// Connect to DB
+connectDB();
 const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server, { cors: { origin: '*' } });
@@ -42,8 +48,15 @@ global.io = io;
 async function startServer() {
   await dbConnect();
 
-  app.use(cors());
+  // Middleware
+
+  
   app.use(express.json());
+  app.use('/api', priceRoutes);
+  
+  // Scheduler to fetch from CoinCap
+startScheduler();
+  app.use(cors());
   app.use(rateLimit);
   app.use(ipBlocker);
   app.use(morgan('combined'));
