@@ -17,7 +17,6 @@ const tradesRoutes = require('./routes/trades');
 const orderbookRoutes = require('./routes/orderbook');
 const candlesRoutes = require('./routes/candles');
 const adminBotRoutes = require('./routes/admin/bots');
-const { startBot } = require('./bots/marketMakerBot');
 const dbConnect = require('./config/db.config');
 
 const app = express();
