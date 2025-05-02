@@ -1,6 +1,6 @@
 // ✅ server.js
 const express = require('express');
-const connectDB = require('./config/db');
+const connectDB = require('./config/db.js');
 const priceRoutes = require('./routes/price.routes');
 const startScheduler = require('./utils/scheduler');
 const http = require('http');
