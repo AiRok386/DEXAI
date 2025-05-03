@@ -1,21 +1,14 @@
+// utils/fetchBinanceMarkets.js
 const axios = require('axios');
 
-async function fetchBinanceData(symbol = 'BTCUSDT') {
+async function fetchBinanceMarkets() {
   try {
-    const response = await axios.get(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`);
-
-    return {
-      symbol,
-      price: parseFloat(response.data.lastPrice),
-      volume: parseFloat(response.data.volume),
-      priceChangePercent: parseFloat(response.data.priceChangePercent),
-      highPrice: parseFloat(response.data.highPrice),
-      lowPrice: parseFloat(response.data.lowPrice),
-    };
+    const response = await axios.get('https://api.binance.com/api/v3/ticker/24hr');
+    return response.data;
   } catch (error) {
-    console.error(`❌ Error fetching data from Binance for ${symbol}:`, error.message);
-    return null;
+    console.error('❌ Error fetching Binance data:', error.message);
+    return [];
   }
 }
 
-module.exports = fetchBinanceData;
+module.exports = fetchBinanceMarkets;
