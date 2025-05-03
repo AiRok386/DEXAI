@@ -79,5 +79,6 @@ async function startServer() {
     console.error('❌ Failed to start server:', error);
   }
 }
+const startScheduler = require('./utils/scheduler').startScheduler;
 
 startServer();
