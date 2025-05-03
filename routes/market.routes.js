@@ -1,8 +1,9 @@
+// routes/market.routes.js
 const express = require('express');
 const router = express.Router();
-const { getAllMarkets } = require('../controllers/marketController');
+const { updateAllMarkets, getAllMarkets } = require('../controllers/marketController');
 
-// GET /api/markets
-router.get('/', getAllMarkets);
+router.get('/update', updateAllMarkets); // manually trigger update
+router.get('/', getAllMarkets); // get live mirrored market data
 
 module.exports = router;
