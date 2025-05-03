@@ -1,40 +1,16 @@
+// models/Market.js
 const mongoose = require('mongoose');
 
 const marketSchema = new mongoose.Schema({
-  id: {
-    type: String,
-    required: true,
-    unique: true // CoinCap asset ID like "bitcoin", "ethereum"
-  },
-  name: {
-    type: String,
-    required: true
-  },
-  symbol: {
-    type: String,
-    required: true
-  },
-  priceUsd: {
-    type: Number,
-    required: true
-  },
-  volumeUsd24Hr: {
-    type: Number,
-    required: false
-  },
-  changePercent24Hr: {
-    type: Number,
-    required: false
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-marketSchema.pre('save', function (next) {
-  this.updatedAt = new Date();
-  next();
+  symbol: { type: String, required: true, unique: true },
+  baseAsset: { type: String, required: true },
+  quoteAsset: { type: String, required: true },
+  price: { type: Number, required: true },
+  volume: { type: Number, required: true },
+  priceChangePercent: { type: Number },
+  highPrice: { type: Number },
+  lowPrice: { type: Number },
+  updatedAt: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('Market', marketSchema);
