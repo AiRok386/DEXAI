@@ -51,5 +51,40 @@ router.get('/:symbol', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch order book' });
   }
 });
+// routes/orderbook.js
+
+const express = require('express');
+const redis = require('redis');
+const OrderBook = require('../models/OrderBook');
+
+const redisClient = redis.createClient();
+const router = express.Router();
+
+// Endpoint to get the latest order book data for a specific symbol
+router.get('/:symbol', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+
+    // Check Redis cache first
+    const cachedOrderBook = await redisClient.getAsync(symbol);
+
+    if (cachedOrderBook) {
+      return res.json(JSON.parse(cachedOrderBook)); // Return cached data
+    }
+
+    // If not found in cache, fetch from MongoDB
+    const orderBook = await OrderBook.findOne({ symbol });
+
+    if (!orderBook) {
+      return res.status(404).json({ message: 'Order book data not found for symbol.' });
+    }
+
+    return res.json(orderBook);
+  } catch (error) {
+    console.error('❌ Error fetching order book:', error.message);
+    return res.status(500).json({ message: 'Failed to fetch order book data.' });
+  }
+});
+
 
 module.exports = router;
