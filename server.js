@@ -93,4 +93,6 @@ app.use('/api/candles', candlesRoutes);
 app.use('/api/orderbook', orderbookRoutes);
 const tradesRoutes = require('./routes/trades.routes');
 app.use('/api/trades', tradesRoutes);
-startServer();
+const { startUpdater } = require('./Jobs/dataUpdater');
+startUpdater();
+
