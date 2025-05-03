@@ -22,6 +22,8 @@ const candlesRoutes = require('./routes/candles');
 const adminBotRoutes = require('./routes/admin/bots');
 const botRoutes = require('./routes/bot.routes');
 const marketRoutes = require('./routes/market.routes');
+require('./binanceFetcher'); // start background job
+
 
 // Binance data updater
 const { startBinanceUpdater } = require('./utils/binanceUpdater');
