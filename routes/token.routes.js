@@ -1,14 +1,15 @@
+// routes/token.routes.js
 const express = require('express');
 const router = express.Router();
 const tokenController = require('../controllers/token.controller');
 const { protectAdmin } = require('../middlewares/auth.middleware');
 
-// ⭐ Admin Routes
-router.post('/admin/token', protectAdmin, tokenController.createToken); // Create
-router.put('/admin/token/:id', protectAdmin, tokenController.updateToken); // Update
-router.delete('/admin/token/:id', protectAdmin, tokenController.deleteToken); // Delete
+// 🟢 Public Route (for frontend)
+router.get('/', tokenController.getActiveTokens); // GET /api/tokens
 
-// ⭐ Public Route
-router.get('/tokens', tokenController.getActiveTokens); // Fetch all active tokens (frontend use)
+// 🔒 Admin Routes (optional, protected)
+router.post('/admin', protectAdmin, tokenController.createToken);
+router.put('/admin/:id', protectAdmin, tokenController.updateToken);
+router.delete('/admin/:id', protectAdmin, tokenController.deleteToken);
 
 module.exports = router;
