@@ -1,7 +1,9 @@
+// marketMakerBot.js - Using Binance REST API instead of CoinCap
+
+const axios = require('axios');
 const Order = require('../models/Order.model');
 const Token = require('../models/token.model');
 const randomFloat = require('../utils/randomFloat');
-const fetchCoinCapPrice = require('../utils/fetchCoinCapPrice'); // ✅ Import new utility
 
 const SPREAD_PERCENT = 0.5; // % spread between buy/sell
 const MIN_ORDER_AMOUNT = 0.01;
@@ -11,6 +13,18 @@ const BOT_INTERVAL_MS = 10000; // 10 seconds
 let isBotRunning = false;
 let botInterval = null;
 
+// ✅ Fetch live price from Binance REST API\async function fetchBinancePrice(symbol) {
+  try {
+    const pair = `${symbol.toLowerCase()}usdt`; // e.g., btcusdt
+    const url = `https://api.binance.com/api/v3/ticker/price?symbol=${pair.toUpperCase()}`;
+    const response = await axios.get(url);
+    return parseFloat(response.data.price);
+  } catch (error) {
+    console.error(`❌ Failed to fetch Binance price for ${symbol}:`, error.message);
+    return null;
+  }
+}
+
 // ✅ Main logic to place market maker orders
 async function runMarketMaker() {
   if (!isBotRunning) return;
@@ -19,11 +33,9 @@ async function runMarketMaker() {
     const tokens = await Token.find({ active: true });
 
     for (const token of tokens) {
-      const symbol = token.symbol.toLowerCase(); // e.g., 'btc' -> 'bitcoin'
-      const coinCapId = getCoinCapId(symbol); // Convert symbol to CoinCap ID
-      if (!coinCapId) continue;
+      const symbol = token.symbol.toLowerCase();
 
-      const basePrice = await fetchCoinCapPrice(coinCapId);
+      const basePrice = await fetchBinancePrice(symbol);
       if (!basePrice) continue;
 
       // Buy order
@@ -52,24 +64,11 @@ async function runMarketMaker() {
         status: 'open',
       });
 
-      console.log(`📈 Bot placed Buy/Sell orders for ${token.symbol} at ${basePrice}`);
+      console.log(`🤖 Placed buy/sell orders for ${token.symbol} at base price ${basePrice}`);
     }
   } catch (err) {
     console.error('❌ Market Maker Bot Error:', err);
   }
-}
-
-// ✅ Converts token symbols to CoinCap IDs
-function getCoinCapId(symbol) {
-  const map = {
-    btc: 'bitcoin',
-    eth: 'ethereum',
-    usdt: 'tether',
-    bnb: 'binance-coin',
-    sol: 'solana',
-    // Add more mappings here as needed
-  };
-  return map[symbol] || null;
 }
 
 // ✅ Start the bot
