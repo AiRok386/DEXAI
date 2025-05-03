@@ -71,3 +71,47 @@ module.exports = {
   fetchAndStoreData,
   getMarketDataFromMemory
 };
+// services/binanceService.js
+
+const axios = require('axios');
+const marketDataStore = require('../memory/marketdatastore');
+const { updateMarketData } = require('../utils/binanceUpdater');
+
+// Fetch market data from Binance and store it in memory
+async function fetchAndStoreMarketData(symbol) {
+  try {
+    const cachedData = marketDataStore.get(symbol); // Check if data is in memory
+
+    if (cachedData) {
+      console.log(`⚡ Using cached data for ${symbol}`);
+      return cachedData; // Return cached data if available
+    }
+
+    // If data is not in memory, fetch from Binance API
+    const response = await axios.get(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`);
+    const data = response.data;
+
+    const formattedData = {
+      symbol: data.symbol,
+      price: parseFloat(data.lastPrice),
+      priceChangePercent: parseFloat(data.priceChangePercent),
+      volume: parseFloat(data.volume),
+      highPrice: parseFloat(data.highPrice),
+      lowPrice: parseFloat(data.lowPrice),
+      quoteVolume: parseFloat(data.quoteVolume),
+      updatedAt: new Date(),
+    };
+
+    // Store fetched data in memory
+    marketDataStore.set(symbol, formattedData);
+
+    // Optionally, store data in MongoDB or other places
+    await updateMarketData(formattedData);  // Function to update MongoDB or other storage
+
+    return formattedData;
+  } catch (error) {
+    console.error(`❌ Error fetching market data for ${symbol}:`, error.message);
+  }
+}
+
+module.exports = { fetchAndStoreMarketData };
