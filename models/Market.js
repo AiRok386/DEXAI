@@ -1,4 +1,3 @@
-// models/Market.js
 const mongoose = require('mongoose');
 
 const marketSchema = new mongoose.Schema({
@@ -13,4 +12,7 @@ const marketSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Market', marketSchema);
+// ✅ Fix: Only register model if not already defined
+const Market = mongoose.models.Market || mongoose.model('Market', marketSchema);
+
+module.exports = Market;
