@@ -51,7 +51,8 @@ app.use('/api/orderbook', orderbookRoutes);
 app.use('/api/candles', candlesRoutes);
 app.use('/admin/bots', adminBotRoutes);
 app.use('/api/bots', botRoutes);
-app.use('/api/markets', marketRoutes);
+app.use('/api/market', require('./routes/market.routes'));
+
 
 // Root route
 app.get('/', (req, res) => {
