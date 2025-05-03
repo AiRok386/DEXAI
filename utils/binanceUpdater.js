@@ -3,49 +3,66 @@
 const axios = require('axios');
 const MarketModel = require('../models/Market');
 
-const BINANCE_API_URL = 'https://api.binance.com/api/v3/ticker/24hr';
+// Top 15 trading pairs you want to track
+const topSymbols = [
+  'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
+  'DOGEUSDT', 'PEPEUSDT', 'SUIUSDT', 'ADAUSDT', 'TRXUSDT',
+  'TONUSDT', 'SHIBUSDT', 'AVAXUSDT', 'LINKUSDT', 'LTCUSDT'
+];
 
+// In-memory store for fast frontend access
+const inMemoryMarketData = {};
+
+// Fetch 24hr ticker data for top 15 symbols
 async function fetchAndUpdateBinanceData() {
   try {
-    const response = await axios.get(BINANCE_API_URL);
-    const marketDataArray = response.data;
+    for (const symbol of topSymbols) {
+      const url = `https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`;
+      const response = await axios.get(url);
+      const data = response.data;
 
-    if (!Array.isArray(marketDataArray)) {
-      console.error('Unexpected response from Binance API. Expected array.');
-      return;
-    }
-
-    for (const data of marketDataArray) {
       const formattedData = {
         symbol: data.symbol,
+        baseAsset: data.symbol.replace('USDT', ''),
+        quoteAsset: 'USDT',
         price: parseFloat(data.lastPrice),
         priceChangePercent: parseFloat(data.priceChangePercent),
         highPrice: parseFloat(data.highPrice),
         lowPrice: parseFloat(data.lowPrice),
         volume: parseFloat(data.volume),
-        quoteVolume: parseFloat(data.quoteVolume),
-        openPrice: parseFloat(data.openPrice),
-        closeTime: new Date(data.closeTime),
-        updatedAt: new Date(),
+        updatedAt: new Date()
       };
 
+      // Save in memory
+      inMemoryMarketData[symbol] = formattedData;
+
+      // Save to MongoDB
       await MarketModel.findOneAndUpdate(
-        { symbol: formattedData.symbol },
+        { symbol },
         { $set: formattedData },
         { upsert: true, new: true }
       );
     }
 
-    console.log(`✅ Updated ${marketDataArray.length} trading pairs from Binance.`);
+    console.log(`✅ Updated ${topSymbols.length} pairs from Binance.`);
   } catch (error) {
-    console.error('❌ Error fetching/updating Binance market data:', error.message);
+    console.error('❌ Error fetching/updating Binance data:', error.message);
   }
 }
 
-function startBinanceUpdater(interval = 5000) {
-  fetchAndUpdateBinanceData(); // initial run
+// Start periodic updater
+function startBinanceUpdater(interval = 10000) {
+  fetchAndUpdateBinanceData(); // initial fetch
   setInterval(fetchAndUpdateBinanceData, interval);
-  console.log('🔁 Binance market data updater started (every', interval / 1000, 'seconds).');
+  console.log(`🔁 Binance data updater started (every ${interval / 1000}s)`);
 }
 
-module.exports = { startBinanceUpdater };
+// To expose memory cache to routes
+function getMarketDataFromMemory() {
+  return inMemoryMarketData;
+}
+
+module.exports = {
+  startBinanceUpdater,
+  getMarketDataFromMemory
+};
