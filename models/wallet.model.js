@@ -5,13 +5,7 @@ const walletschema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     currency: { type: String, required: true },
     balance: { type: Number, default: 0 },
-    address: { type: String }
-});
-
-
-
-const walletSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // User reference
+    address: { type: String },
 
     // ⭐ For each token/coin
     balances: [{
