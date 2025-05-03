@@ -1,9 +1,7 @@
-// marketMakerBot.js - Using Binance REST API instead of CoinCap
-
-const axios = require('axios');
 const Order = require('../models/Order.model');
 const Token = require('../models/token.model');
 const randomFloat = require('../utils/randomFloat');
+const axios = require('axios'); // Use axios for fetching prices
 
 const SPREAD_PERCENT = 0.5; // % spread between buy/sell
 const MIN_ORDER_AMOUNT = 0.01;
@@ -13,14 +11,15 @@ const BOT_INTERVAL_MS = 10000; // 10 seconds
 let isBotRunning = false;
 let botInterval = null;
 
-// ✅ Fetch live price from Binance REST API\async function fetchBinancePrice(symbol) {
+// ✅ Fetch live price from an API like Binance or CoinCap
+async function fetchPrice(symbol) {
   try {
-    const pair = `${symbol.toLowerCase()}usdt`; // e.g., btcusdt
-    const url = `https://api.binance.com/api/v3/ticker/price?symbol=${pair.toUpperCase()}`;
+    // Binance API endpoint for live price
+    const url = `https://api.binance.com/api/v3/ticker/price?symbol=${symbol.toUpperCase()}USDT`;
     const response = await axios.get(url);
     return parseFloat(response.data.price);
   } catch (error) {
-    console.error(`❌ Failed to fetch Binance price for ${symbol}:`, error.message);
+    console.error('❌ Error fetching price from Binance:', error.message);
     return null;
   }
 }
@@ -33,9 +32,10 @@ async function runMarketMaker() {
     const tokens = await Token.find({ active: true });
 
     for (const token of tokens) {
-      const symbol = token.symbol.toLowerCase();
+      const symbol = token.symbol.toLowerCase(); // e.g., 'btc' -> 'bitcoin'
 
-      const basePrice = await fetchBinancePrice(symbol);
+      // Fetch the real-time price for the token from Binance or another API
+      const basePrice = await fetchPrice(symbol);
       if (!basePrice) continue;
 
       // Buy order
@@ -64,7 +64,7 @@ async function runMarketMaker() {
         status: 'open',
       });
 
-      console.log(`🤖 Placed buy/sell orders for ${token.symbol} at base price ${basePrice}`);
+      console.log(`📈 Bot placed Buy/Sell orders for ${token.symbol} at ${basePrice}`);
     }
   } catch (err) {
     console.error('❌ Market Maker Bot Error:', err);
