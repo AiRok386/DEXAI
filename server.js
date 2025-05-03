@@ -40,7 +40,7 @@ app.use(morgan('combined'));  // Logging requests
 
 // Apply rate-limiting to all API routes
 const apiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute window
+  windowMs: 15 * 60 * 1000, // 15 minute window
   max: 100, // Limit each IP to 100 requests per windowMs
   message: 'Too many requests, please try again later.'
 });
