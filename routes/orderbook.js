@@ -1,15 +1,26 @@
+// routes/orderbook.js
+
 const express = require('express');
-const router = express.Router();
 const axios = require('axios');
+const redis = require('redis');
+const { promisify } = require('util');
 const OrderBook = require('../models/OrderBook');
 
-// List of allowed trading pairs (Top 15)
+const router = express.Router();
+
+// Allowed top 15 trading pairs
 const allowedSymbols = [
   'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
   'DOGEUSDT', 'PEPEUSDT', 'SUIUSDT', 'ADAUSDT', 'TRXUSDT',
   'TONUSDT', 'LTCUSDT', 'AVAXUSDT', 'SHIBUSDT', 'DOTUSDT'
 ];
 
+// Redis client setup
+const redisClient = redis.createClient();
+const getAsync = promisify(redisClient.get).bind(redisClient);
+const setAsync = promisify(redisClient.setex).bind(redisClient); // with expiry
+
+// GET /api/orderbook/:symbol
 router.get('/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
 
@@ -18,15 +29,17 @@ router.get('/:symbol', async (req, res) => {
   }
 
   try {
-    // Fetch the order book data from Binance API
-    const response = await axios.get(`https://api.binance.com/api/v3/depth`, {
-      params: {
-        symbol: symbol,
-        limit: 20 // You can adjust to 5, 10, 50, etc.
-      }
+    // 1. Check Redis cache first
+    const cachedData = await getAsync(`orderbook:${symbol}`);
+    if (cachedData) {
+      return res.json(JSON.parse(cachedData));
+    }
+
+    // 2. Fetch live data from Binance
+    const response = await axios.get('https://api.binance.com/api/v3/depth', {
+      params: { symbol, limit: 20 }
     });
 
-    // Prepare the data to be saved into MongoDB
     const orderBookData = {
       symbol,
       bids: response.data.bids,
@@ -34,57 +47,23 @@ router.get('/:symbol', async (req, res) => {
       lastUpdateId: response.data.lastUpdateId
     };
 
-    // Save the data to MongoDB
-    const newOrderBook = new OrderBook(orderBookData);
-    await newOrderBook.save();
+    // 3. Save to MongoDB (overwrite if already exists)
+    await OrderBook.findOneAndUpdate(
+      { symbol },
+      orderBookData,
+      { upsert: true, new: true }
+    );
 
-    // Respond with the order book data
-    res.json({
-      symbol,
-      bids: response.data.bids,
-      asks: response.data.asks,
-      lastUpdateId: response.data.lastUpdateId
-    });
+    // 4. Save to Redis cache for 60 seconds
+    await setAsync(`orderbook:${symbol}`, 60, JSON.stringify(orderBookData));
+
+    // 5. Respond with fresh data
+    res.json(orderBookData);
 
   } catch (error) {
-    console.error('❌ Orderbook fetch error:', error.message);
-    res.status(500).json({ error: 'Failed to fetch order book' });
+    console.error(`❌ Failed to fetch order book for ${symbol}:`, error.message);
+    res.status(500).json({ error: 'Failed to fetch order book data' });
   }
 });
-// routes/orderbook.js
-
-const express = require('express');
-const redis = require('redis');
-const OrderBook = require('../models/OrderBook');
-
-const redisClient = redis.createClient();
-const router = express.Router();
-
-// Endpoint to get the latest order book data for a specific symbol
-router.get('/:symbol', async (req, res) => {
-  try {
-    const { symbol } = req.params;
-
-    // Check Redis cache first
-    const cachedOrderBook = await redisClient.getAsync(symbol);
-
-    if (cachedOrderBook) {
-      return res.json(JSON.parse(cachedOrderBook)); // Return cached data
-    }
-
-    // If not found in cache, fetch from MongoDB
-    const orderBook = await OrderBook.findOne({ symbol });
-
-    if (!orderBook) {
-      return res.status(404).json({ message: 'Order book data not found for symbol.' });
-    }
-
-    return res.json(orderBook);
-  } catch (error) {
-    console.error('❌ Error fetching order book:', error.message);
-    return res.status(500).json({ message: 'Failed to fetch order book data.' });
-  }
-});
-
 
 module.exports = router;
