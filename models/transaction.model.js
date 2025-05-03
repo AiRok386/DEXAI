@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 // ⭐ Transaction schema
-const TransactionSchema = new mongoose.Schema({
+const transactionSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, enum: ['deposit', 'withdrawal'], required: true },
     tokenSymbol: { type: String, required: true }, // BTC, ETH, USDT
