@@ -1,31 +1,27 @@
 const Token = require('../models/token.model');
-const { saveOrUpdateMarketData } = require('./marketUtils');
-const fetchCoinCapPrice = require('./fetchCoinCapPrice');
+const fetchBinanceData = require('./fetchBinanceData');
 
-const UPDATE_INTERVAL = 30 * 1000; // 30 seconds
+const UPDATE_INTERVAL = 5000; // 5 seconds
 
 async function updateTokenPrices() {
   try {
     const tokens = await Token.find({ active: true });
 
     for (const token of tokens) {
-      const price = await fetchCoinCapPrice(token.assetId);
+      const data = await fetchBinanceData(token.symbol); // e.g. BTCUSDT, ETHUSDT
 
-      if (price !== null) {
-        token.currentPrice = price;
+      if (data !== null) {
+        token.currentPrice = data.price;
+        token.volume = data.volume;
+        token.priceChangePercent = data.priceChangePercent;
+        token.highPrice = data.highPrice;
+        token.lowPrice = data.lowPrice;
+
         await token.save();
 
-        console.log(`✅ Updated ${token.symbol} price to $${price.toFixed(2)}`);
-
-        const marketData = {
-          symbol: token.symbol + 'USDT', // Example format like BTCUSDT
-          price: price,
-          volume: token.volume || 0 // Optional: add more fields if needed
-        };
-
-        await saveOrUpdateMarketData(marketData);
+        console.log(`✅ Updated ${token.symbol} | Price: $${data.price} | Vol: ${data.volume}`);
       } else {
-        console.warn(`⚠️ Skipped ${token.symbol} — price unavailable`);
+        console.warn(`⚠️ Skipped ${token.symbol} — data unavailable`);
       }
     }
   } catch (error) {
@@ -34,8 +30,8 @@ async function updateTokenPrices() {
 }
 
 function startPriceUpdater() {
-  updateTokenPrices();
-  setInterval(updateTokenPrices, UPDATE_INTERVAL);
+  updateTokenPrices(); // Run immediately
+  setInterval(updateTokenPrices, UPDATE_INTERVAL); // Then repeat
   console.log('🔁 Token Price Updater started.');
 }
 
