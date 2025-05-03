@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 // ⭐ ICO schema
-const ICOSchema = new mongoose.Schema({
+const icoSchema = new mongoose.Schema({
     projectName: { type: String, required: true },
     description: { type: String }, // Brief about the project
     tokenSymbol: { type: String, required: true },
