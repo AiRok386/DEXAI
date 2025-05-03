@@ -84,5 +84,12 @@ async function startServer() {
     console.error('❌ Failed to start server:', err);
   }
 }
+// Import routes
+const candlesRoutes = require('./routes/candles.routes');
+const orderbookRoutes = require('./routes/orderbook.routes');
+
+// Use routes
+app.use('/api/candles', candlesRoutes);
+app.use('/api/orderbook', orderbookRoutes);
 
 startServer();
