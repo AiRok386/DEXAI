@@ -1,28 +1,29 @@
 const Token = require('../models/token.model');
-const { saveOrUpdateMarketData } = require('./marketUtils'); // Import saveOrUpdateMarketData
+const { saveOrUpdateMarketData } = require('./marketUtils');
 const fetchCoinCapPrice = require('./fetchCoinCapPrice');
 
 const UPDATE_INTERVAL = 30 * 1000; // 30 seconds
 
-// Function to update token prices
 async function updateTokenPrices() {
   try {
-    const tokens = await Token.find({ active: true }); // Fetch all active tokens
+    const tokens = await Token.find({ active: true });
 
     for (const token of tokens) {
-      const price = await fetchCoinCapPrice(token.assetId); // Fetch live price using CoinCap API
+      const price = await fetchCoinCapPrice(token.assetId);
+
       if (price !== null) {
-        token.currentPrice = price; // Update the price on the token model
-        await token.save(); // Save token with the new price in the database
+        token.currentPrice = price;
+        await token.save();
+
         console.log(`✅ Updated ${token.symbol} price to $${price.toFixed(2)}`);
 
-        // Now call saveOrUpdateMarketData to update the market data separately
         const marketData = {
-          symbol: token.symbol,
+          symbol: token.symbol + 'USDT', // Example format like BTCUSDT
           price: price,
-          volume: token.volume || 0, // Assuming you have volume or other fields you need to update
+          volume: token.volume || 0 // Optional: add more fields if needed
         };
-        await saveOrUpdateMarketData(marketData); // Save or update market data in the MongoDB
+
+        await saveOrUpdateMarketData(marketData);
       } else {
         console.warn(`⚠️ Skipped ${token.symbol} — price unavailable`);
       }
@@ -32,10 +33,9 @@ async function updateTokenPrices() {
   }
 }
 
-// Auto-run in background every X seconds
 function startPriceUpdater() {
-  updateTokenPrices(); // Run immediately once
-  setInterval(updateTokenPrices, UPDATE_INTERVAL); // Run every 30 seconds
+  updateTokenPrices();
+  setInterval(updateTokenPrices, UPDATE_INTERVAL);
   console.log('🔁 Token Price Updater started.');
 }
 
