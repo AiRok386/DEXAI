@@ -1,24 +1,38 @@
 const express = require('express');
 const router = express.Router();
-const OrderBookSnapshot = require('../models/OrderBookSnapshot');
+const axios = require('axios');
 
-// GET /api/orderbook/:symbol
+// List only the top 15 pairs you support
+const allowedSymbols = [
+  'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
+  'DOGEUSDT', 'PEPEUSDT', 'SUIUSDT', 'ADAUSDT', 'TRXUSDT',
+  'TONUSDT', 'LTCUSDT', 'AVAXUSDT', 'SHIBUSDT', 'DOTUSDT'
+];
+
 router.get('/:symbol', async (req, res) => {
+  const symbol = req.params.symbol.toUpperCase();
+
+  if (!allowedSymbols.includes(symbol)) {
+    return res.status(400).json({ error: 'Symbol not allowed' });
+  }
+
   try {
-    const symbol = req.params.symbol.toLowerCase();
+    const response = await axios.get(`https://api.binance.com/api/v3/depth`, {
+      params: {
+        symbol: symbol,
+        limit: 20  // You can adjust to 5, 10, 50, etc.
+      }
+    });
 
-    const snapshot = await OrderBookSnapshot.findOne({ symbol })
-      .sort({ createdAt: -1 }) // Get latest
-      .limit(1);
-
-    if (!snapshot) {
-      return res.status(404).json({ success: false, message: 'Order book not found' });
-    }
-
-    res.json({ success: true, orderbook: snapshot });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Internal Server Error' });
+    res.json({
+      symbol,
+      bids: response.data.bids,
+      asks: response.data.asks,
+      lastUpdateId: response.data.lastUpdateId
+    });
+  } catch (error) {
+    console.error('❌ Orderbook fetch error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch order book' });
   }
 });
 
