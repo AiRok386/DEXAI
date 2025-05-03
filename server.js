@@ -6,27 +6,26 @@ const http = require('http');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const morgan = require('morgan');
-const rateLimit = require('./middlewares/ratelimiter');
-const ipBlocker = require('./middlewares/ipblocker');
+const rateLimit = require('express-rate-limit');
+const ipBlocker = require('./middlewares/ipblocker');  // Custom IP blocker middleware
+const { startBinanceUpdater } = require('./utils/binanceUpdater');  // In-memory market data fetcher
+const { fetchAndStoreData } = require('./services/binanceDataService');  // Periodic data storage from Binance
 
-// Routes
+// Routes for various parts of the app
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const walletRoutes = require('./routes/wallet.routes');
 const tradingRoutes = require('./routes/trade.routes');
 const tokenRoutes = require('./routes/token.routes');
 const icoRoutes = require('./routes/ico.routes');
-const tradesRoutes = require('./routes/trades');
-const orderbookRoutes = require('./routes/orderbook');
-const candlesRoutes = require('./routes/candles');
+const tradesRoutes = require('./routes/trades.routes');
+const orderbookRoutes = require('./routes/orderbook.routes');
+const candlesRoutes = require('./routes/candles.routes');
 const adminBotRoutes = require('./routes/admin/bots');
 const botRoutes = require('./routes/bot.routes');
 const marketRoutes = require('./routes/market.routes');
 
-// In-memory market updater and Binance services
-const { startBinanceUpdater } = require('./utils/binanceUpdater');
-const { fetchAndStoreData } = require('./services/binanceDataService');
-
+// Set up Express app
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -36,9 +35,16 @@ app.set('trust proxy', 1);
 // Middlewares
 app.use(express.json());
 app.use(cors());
-app.use(rateLimit);
-app.use(ipBlocker);
-app.use(morgan('combined'));
+app.use(ipBlocker);  // Block suspicious IP addresses
+app.use(morgan('combined'));  // Logging requests
+
+// Apply rate-limiting to all API routes
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests, please try again later.'
+});
+app.use('/api/', apiLimiter);  // Apply rate limit middleware globally
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -54,7 +60,7 @@ app.use('/admin/bots', adminBotRoutes);
 app.use('/api/bots', botRoutes);
 app.use('/api/market', marketRoutes);
 
-// Root Route
+// Root Route (Check if the server is up)
 app.get('/', (req, res) => {
   res.send('🟢 Backend with Binance Market Mirror is running');
 });
@@ -62,18 +68,19 @@ app.get('/', (req, res) => {
 // Connect MongoDB and start server
 async function startServer() {
   try {
+    // MongoDB connection
     await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
     console.log('✅ MongoDB connected successfully.');
 
-    // Start in-memory data fetcher & store
-    startBinanceUpdater();
+    // Start in-memory Binance market updater
+    startBinanceUpdater();  // Periodically fetch and update market data
 
-    // Start periodic data fetch for DB storage
+    // Start periodic data fetch for DB storage (every 10 seconds)
     fetchAndStoreData();
-    setInterval(fetchAndStoreData, 10000); // every 10s
+    setInterval(fetchAndStoreData, 10000);  // every 10s
 
     // Start express server
     const server = http.createServer(app);
@@ -84,25 +91,6 @@ async function startServer() {
     console.error('❌ Failed to start server:', err);
   }
 }
-// Import routes
-const candlesRoutes = require('./routes/candles.routes');
-const orderbookRoutes = require('./routes/orderbook.routes');
 
-// Use routes
-app.use('/api/candles', candlesRoutes);
-app.use('/api/orderbook', orderbookRoutes);
-const tradesRoutes = require('./routes/trades.routes');
-app.use('/api/trades', tradesRoutes);
-const { startUpdater } = require('./Jobs/dataUpdater');
-const rateLimit = require('express-rate-limit');
-
-const apiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests, please try again later.'
-});
-
-app.use('/api/', apiLimiter); // Apply rate-limiting to all API routes
-
-startUpdater();
-
+// Start the server
+startServer();
