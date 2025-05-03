@@ -43,4 +43,35 @@ function startOrderBookUpdater() {
   console.log('🔁 Order book updater started (every 10 seconds).');
 }
 
+try {
+  // Attempt to fetch data from Binance API
+  const response = await axios.get(`${BINANCE_API_URL}?symbol=${symbol}&limit=5`);
+  const orderBookData = response.data;
+
+  if (!orderBookData.bids || !orderBookData.asks) {
+    throw new Error('Invalid order book data received from Binance');
+  }
+
+  const formattedData = {
+    symbol,
+    bids: orderBookData.bids,
+    asks: orderBookData.asks,
+    updatedAt: new Date(),
+  };
+
+  // Save to MongoDB
+  await OrderBook.findOneAndUpdate(
+    { symbol: formattedData.symbol },
+    { $set: formattedData },
+    { upsert: true, new: true }
+  );
+
+  // Cache data in Redis for 10 seconds
+  redisClient.setex(symbol, 10, JSON.stringify(formattedData));
+
+  console.log(`✅ Updated and cached order book for ${symbol}`);
+} catch (error) {
+  console.error(`❌ Error processing order book for ${symbol}:`, error.message);
+}
+
 module.exports = startOrderBookUpdater;
