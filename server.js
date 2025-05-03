@@ -82,4 +82,13 @@ async function startServer() {
 }
 const startScheduler = require('./utils/scheduler').startScheduler;
 
+const { fetchAndStoreData } = require('./services/binanceDataService');
+
+// Fetch every 10 seconds
+setInterval(fetchAndStoreData, 10000);
+
+// Initial fetch
+fetchAndStoreData();
+
+
 startServer();
