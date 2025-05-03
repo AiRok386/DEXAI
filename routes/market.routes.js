@@ -1,18 +1,24 @@
+// routes/market.routes.js
+
 const express = require('express');
-const { getMemoryData } = require('../services/binanceDataService');
 const router = express.Router();
+const { getMarketDataFromMemory } = require('../utils/binanceUpdater');
 
-// GET /api/market/top15
-router.get('/top15', (req, res) => {
-  res.json(getMemoryData());
-});
-
-const { getAllMarketData, getMarketData } = require('../marketDataStore');
-
-router.get('/markets/:symbol', (req, res) => {
-  const data = getMarketData(req.params.symbol.toUpperCase());
-  if (!data) return res.status(404).json({ error: 'Symbol not found' });
-  res.json(data);
+// @route   GET /api/market/top
+// @desc    Get in-memory top 15 market data
+// @access  Public
+router.get('/top', (req, res) => {
+  try {
+    const data = getMarketDataFromMemory();
+    res.status(200).json({
+      success: true,
+      count: Object.keys(data).length,
+      data: Object.values(data)
+    });
+  } catch (error) {
+    console.error('❌ Error returning market data:', error.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 module.exports = router;
