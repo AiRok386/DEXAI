@@ -1,32 +1,64 @@
+// routes/kline.routes.js
+
 const express = require('express');
 const router = express.Router();
-const Kline = require('../models/Kline');  // Import the Kline model
+const Kline = require('../models/Kline');
 
-// Route to get all candlestick data for all symbols
+// @route   GET /api/klines
+// @desc    Get all klines across all symbols and intervals (for debugging or admin use)
 router.get('/', async (req, res) => {
   try {
-    // Fetch all candlestick data entries from the database
-    const klines = await Kline.find({});
-    res.json(klines);  // Return the kline data as a JSON response
+    const klines = await Kline.find({}).sort({ openTime: -1 }).limit(500);
+    res.status(200).json(klines);
   } catch (error) {
-    console.error('❌ Error fetching klines:', error);
-    res.status(500).json({ error: '❌ Failed to fetch klines' });
+    console.error('❌ Error fetching all klines:', error.message);
+    res.status(500).json({ error: 'Failed to fetch all candlestick data' });
   }
 });
 
-// Route to get candlestick data for a specific symbol (e.g., BTC-USDT)
+// @route   GET /api/klines/:symbol
+// @desc    Get all klines for a given symbol (all intervals)
+// @example /api/klines/BTCUSDT
 router.get('/:symbol', async (req, res) => {
-  const { symbol } = req.params;  // Get the symbol from the URL params
+  const { symbol } = req.params;
   try {
-    // Fetch the kline data for the specific symbol
-    const klines = await Kline.find({ symbol });
-    if (!klines || klines.length === 0) {
-      return res.status(404).json({ error: '❌ No klines found for symbol' });
+    const klines = await Kline.find({ symbol: symbol.toUpperCase() })
+      .sort({ openTime: -1 })
+      .limit(100);
+    
+    if (!klines.length) {
+      return res.status(404).json({ error: 'No candlestick data found for this symbol' });
     }
-    res.json(klines);  // Return the klines for the symbol
+
+    res.status(200).json(klines);
   } catch (error) {
-    console.error('❌ Error fetching klines:', error);
-    res.status(500).json({ error: '❌ Failed to fetch klines for symbol' });
+    console.error(`❌ Error fetching klines for ${symbol}:`, error.message);
+    res.status(500).json({ error: 'Failed to fetch candlestick data' });
+  }
+});
+
+// @route   GET /api/klines/:symbol/:interval
+// @desc    Get latest 100 klines for a given symbol and interval
+// @example /api/klines/BTCUSDT/1m
+router.get('/:symbol/:interval', async (req, res) => {
+  const { symbol, interval } = req.params;
+
+  try {
+    const klines = await Kline.find({
+      symbol: symbol.toUpperCase(),
+      interval
+    })
+      .sort({ openTime: -1 })
+      .limit(100);
+
+    if (!klines.length) {
+      return res.status(404).json({ error: 'No candlestick data found for this symbol and interval' });
+    }
+
+    res.status(200).json(klines);
+  } catch (error) {
+    console.error(`❌ Failed to fetch klines for ${symbol} (${interval}):`, error.message);
+    res.status(500).json({ error: 'Failed to fetch candlestick data' });
   }
 });
 
