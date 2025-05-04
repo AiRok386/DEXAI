@@ -1,26 +1,27 @@
-// routes/orderbook.routes.js
+// routes/orderbook.js
 
 const express = require('express');
 const router = express.Router();
-const OrderBook = require('../models/OrderBook');
+const OrderBookSnapshot = require('../models/OrderBookSnapshot');
 
-// GET /api/orderbook/:symbol
-// Returns the latest order book snapshot for a given symbol (e.g., BTCUSDT)
+// @route   GET /api/orderbook/:symbol
+// @desc    Get the latest order book snapshot from MongoDB for a given symbol
+// @example /api/orderbook/BTCUSDT
 router.get('/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
 
   try {
-    const latestSnapshot = await OrderBook.findOne({ symbol })
-      .sort({ updatedAt: -1 }); // Assuming timestamps are auto-managed
+    const snapshot = await OrderBookSnapshot.findOne({ symbol })
+      .sort({ createdAt: -1 });
 
-    if (!latestSnapshot) {
+    if (!snapshot) {
       return res.status(404).json({ error: 'Order book not found for this symbol' });
     }
 
-    res.status(200).json(latestSnapshot);
+    res.json(snapshot);
   } catch (error) {
-    console.error(`❌ Failed to fetch order book for ${symbol}:`, error.message);
-    res.status(500).json({ error: 'Internal server error while retrieving order book' });
+    console.error(`❌ Error fetching order book for ${symbol}:`, error.message);
+    res.status(500).json({ error: 'Failed to fetch order book data' });
   }
 });
 
