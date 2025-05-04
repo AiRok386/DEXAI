@@ -1,34 +1,28 @@
 // routes/candles.routes.js
 
 const express = require('express');
-const axios = require('axios');
 const router = express.Router();
+const Kline = require('../models/Kline');
 
-// GET /api/candles/:symbol?interval=1m&limit=100
-router.get('/:symbol', async (req, res) => {
-  const { symbol } = req.params;
-  const { interval = '1m', limit = 100 } = req.query;
+// @route   GET /api/candles/:symbol/:interval
+// @desc    Get the latest 100 candlestick data from MongoDB for given symbol and interval
+// @example /api/candles/BTCUSDT/1m
+router.get('/:symbol/:interval', async (req, res) => {
+  const { symbol, interval } = req.params;
 
   try {
-    const response = await axios.get('https://api.binance.com/api/v3/klines', {
-      params: {
-        symbol: symbol.toUpperCase(),
-        interval,
-        limit,
-      },
-    });
+    const klines = await Kline.find({
+      symbol: symbol.toUpperCase(),
+      interval: interval
+    })
+      .sort({ openTime: -1 })
+      .limit(100);
 
-    const formattedData = response.data.map((kline) => ({
-      openTime: kline[0],
-      open: kline[1],
-      high: kline[2],
-      low: kline[3],
-      close: kline[4],
-      volume: kline[5],
-      closeTime: kline[6],
-    }));
+    if (!klines.length) {
+      return res.status(404).json({ error: 'No candlestick data found for this symbol and interval.' });
+    }
 
-    res.status(200).json(formattedData);
+    res.json(klines);
   } catch (error) {
     console.error(`❌ Error fetching Kline data for ${symbol}:`, error.message);
     res.status(500).json({ error: 'Failed to fetch candlestick data' });
