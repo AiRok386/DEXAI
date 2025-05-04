@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 // Trade Schema
-const TradeSchema = new mongoose.Schema(
+const tradeSchema = new mongoose.Schema(
   {
     symbol: {
       type: String,
@@ -44,6 +44,6 @@ const TradeSchema = new mongoose.Schema(
 );
 
 // Optional: Set TTL (Time To Live) for trades. Auto-delete after 24 hours (86400s).
-TradeSchema.index({ timestamp: 1 }, { expireAfterSeconds: 86400 });
+tradeSchema.index({ timestamp: 1 }, { expireAfterSeconds: 86400 });
 
-module.exports = mongoose.model('Trade', TradeSchema);
+module.exports = mongoose.model('Trade', tradeSchema);
