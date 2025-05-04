@@ -1,32 +1,40 @@
 const express = require('express');
 const router = express.Router();
-const Trade = require('../models/Trade');  // Import the Trade model
+const Trade = require('../models/Trade');
 
-// Route to get all trade data for all symbols
+// GET /api/trades
+// Returns all trades in the database
 router.get('/', async (req, res) => {
   try {
-    // Fetch all trade entries from the database
-    const trades = await Trade.find({});
-    res.json(trades);  // Return the trades as a JSON response
+    const trades = await Trade.find({}).sort({ timestamp: -1 });
+    if (!trades.length) {
+      return res.status(404).json({ error: '❌ No trades found in the database' });
+    }
+    res.status(200).json(trades);
   } catch (error) {
-    console.error('❌ Error fetching trades:', error);
-    res.status(500).json({ error: '❌ Failed to fetch trades' });
+    console.error('❌ Error fetching all trades:', error.message);
+    res.status(500).json({ error: '❌ Internal server error while retrieving trades' });
   }
 });
 
-// Route to get trade data for a specific symbol (e.g., BTC-USDT)
+// GET /api/trades/:symbol
+// Returns the latest 50 trades for a given symbol (e.g., BTC-USDT)
 router.get('/:symbol', async (req, res) => {
-  const { symbol } = req.params;  // Get the symbol from the URL params
+  const symbol = req.params.symbol.toUpperCase();
+
   try {
-    // Fetch the trades for the specific symbol
-    const trades = await Trade.find({ symbol });
-    if (!trades || trades.length === 0) {
-      return res.status(404).json({ error: '❌ No trades found for symbol' });
+    const trades = await Trade.find({ symbol })
+      .sort({ timestamp: -1 })
+      .limit(50);
+
+    if (!trades.length) {
+      return res.status(404).json({ error: `❌ No trades found for symbol ${symbol}` });
     }
-    res.json(trades);  // Return the trades for the symbol
+
+    res.status(200).json(trades);
   } catch (error) {
-    console.error('❌ Error fetching trades:', error);
-    res.status(500).json({ error: '❌ Failed to fetch trades for symbol' });
+    console.error(`❌ Error fetching trades for ${symbol}:`, error.message);
+    res.status(500).json({ error: '❌ Failed to fetch trade data for symbol' });
   }
 });
 
