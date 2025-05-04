@@ -1,59 +1,116 @@
 // Jobs/dataUpdater.js
 
-const axios = require('axios');
+const WebSocket = require('ws');
 const Market = require('../models/Market'); // MongoDB model
-const { topPairs } = require('../config/constants');
+const { topPairs } = require('../config/constants'); // Top 15 tokens
+const { updateMarketData } = require('../controllers/marketController'); // Helper function to update MongoDB
 
 // In-memory market store (key: symbol, value: market data)
 const marketCache = {};
 
-async function updateMarketData() {
-  console.log('🔄 Updating top 15 market data from Binance...');
+// Bitget WebSocket URL
+const bitgetWSUrl = 'wss://ws.bitget.com/spot/v1/stream';
 
-  for (const symbol of topPairs) {
-    try {
-      const res = await axios.get('https://api.binance.com/api/v3/ticker/24hr', {
-        params: { symbol }
+// Function to handle WebSocket connection and data updates
+function connectWebSocket() {
+  const ws = new WebSocket(bitgetWSUrl);
+
+  ws.on('open', () => {
+    console.log('✅ Connected to Bitget WebSocket');
+    
+    // Subscribe to the top 15 tokens' real-time data for ticker, depth, and kline (candlestick)
+    topPairs.forEach(symbol => {
+      const subscribeMessage = JSON.stringify({
+        "op": "subscribe",
+        "args": [
+          { "channel": `market.${symbol}.ticker` },
+          { "channel": `market.${symbol}.depth` },
+          { "channel": `market.${symbol}.kline` }
+        ]
       });
+      ws.send(subscribeMessage);
+    });
+  });
 
-      const data = res.data;
-      const formatted = {
-        symbol: data.symbol,
-        price: parseFloat(data.lastPrice),
-        priceChangePercent: parseFloat(data.priceChangePercent),
-        highPrice: parseFloat(data.highPrice),
-        lowPrice: parseFloat(data.lowPrice),
-        volume: parseFloat(data.volume),
-        quoteVolume: parseFloat(data.quoteVolume),
-        openPrice: parseFloat(data.openPrice),
-        closeTime: new Date(data.closeTime),
-        updatedAt: new Date()
-      };
+  ws.on('message', (data) => {
+    const message = JSON.parse(data);
 
-      // Save in memory
-      marketCache[symbol] = formatted;
+    // Check if the message is a notification from Bitget
+    if (message.op === 'notify') {
+      const { channel, data: marketData } = message;
 
-      // Save in MongoDB
-      await Market.findOneAndUpdate(
-        { symbol },
-        { $set: formatted },
-        { upsert: true }
-      );
-    } catch (err) {
-      console.error(`❌ Failed to fetch ${symbol}:`, err.message);
+      // Process data based on channel type (ticker, depth, kline)
+      if (channel.includes('ticker')) {
+        updateMarketData('Ticker', marketData);
+      } else if (channel.includes('depth')) {
+        updateMarketData('OrderBook', marketData);
+      } else if (channel.includes('kline')) {
+        updateMarketData('Kline', marketData);
+      }
     }
-  }
+  });
 
-  console.log('✅ Market data updated.');
+  ws.on('close', () => {
+    console.log('❌ WebSocket connection closed. Reconnecting...');
+    setTimeout(connectWebSocket, 5000); // Reconnect after 5 seconds
+  });
+
+  ws.on('error', (err) => {
+    console.error('❌ WebSocket error:', err);
+  });
 }
 
-// Schedule every 10 seconds
+// Update market data in MongoDB and in-memory store
+async function updateMarketData(type, data) {
+  const { symbol } = data;
+  const formattedData = { symbol, timestamp: new Date() };
+
+  // Handle different data types (ticker, order book, kline)
+  if (type === 'Ticker') {
+    formattedData.price = parseFloat(data.last);
+    formattedData.volume = parseFloat(data.volume);
+    formattedData.priceChangePercent = parseFloat(data.priceChangePercent);
+
+    // Update in-memory cache
+    marketCache[symbol] = formattedData;
+
+    // Save to MongoDB
+    await Market.findOneAndUpdate({ symbol }, { $set: formattedData }, { upsert: true });
+  }
+
+  if (type === 'OrderBook') {
+    formattedData.bids = data.bids.map(bid => ({ price: bid[0], quantity: bid[1] }));
+    formattedData.asks = data.asks.map(ask => ({ price: ask[0], quantity: ask[1] }));
+
+    // Update in-memory cache
+    marketCache[symbol] = formattedData;
+
+    // Save to MongoDB
+    await Market.findOneAndUpdate({ symbol }, { $set: formattedData }, { upsert: true });
+  }
+
+  if (type === 'Kline') {
+    formattedData.open = parseFloat(data.open);
+    formattedData.close = parseFloat(data.close);
+    formattedData.high = parseFloat(data.high);
+    formattedData.low = parseFloat(data.low);
+    formattedData.volume = parseFloat(data.volume);
+
+    // Update in-memory cache
+    marketCache[symbol] = formattedData;
+
+    // Save to MongoDB
+    await Market.findOneAndUpdate({ symbol }, { $set: formattedData }, { upsert: true });
+  }
+}
+
+// Start WebSocket connection and data updater
 function startUpdater() {
-  updateMarketData(); // initial fetch
-  setInterval(updateMarketData, 10000);
+  connectWebSocket(); // Initiate WebSocket connection
+  console.log('🔄 Data updater started...');
 }
 
 module.exports = {
   startUpdater,
-  getMarketCache: () => marketCache
+  getMarketCache: () => marketCache,
 };
