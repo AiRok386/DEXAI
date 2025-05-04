@@ -1,66 +1,72 @@
-// services/bitgetWebSocket.js
+// controllers/botController.js
 
-const WebSocket = require('ws');
+const Trade = require('../models/Trade');
+const { getPrice } = require('../services/bitgetWebSocket');
 
-const wsUrl = 'wss://ws.bitget.com/v2/ws/public';
-const tradingPairs = [
-  'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
-  'DOGEUSDT', 'PEPEUSDT', 'SUIUSDT', 'ADAUSDT', 'TRXUSDT',
-  'TONUSDT', 'LTCUSDT', 'AVAXUSDT', 'SHIBUSDT', 'DOTUSDT'
-];
+const activeBots = new Map();
 
-let priceCache = {};
+/**
+ * Start a trading bot
+ */
+exports.startBot = async (req, res) => {
+  const { pair, intervalSeconds, tradeVolume } = req.body;
 
-function connectWebSocket() {
-  const ws = new WebSocket(wsUrl);
+  if (!pair || !intervalSeconds || !tradeVolume) {
+    return res.status(400).json({ message: 'pair, intervalSeconds, and tradeVolume are required' });
+  }
 
-  ws.on('open', () => {
-    console.log('Connected to Bitget WebSocket');
+  if (activeBots.has(pair)) {
+    return res.status(400).json({ message: `Bot for ${pair} is already running` });
+  }
 
-    const subscribeMsg = {
-      op: 'subscribe',
-      args: tradingPairs.map(pair => ({
-        instType: 'SPOT',
-        channel: 'ticker',
-        instId: pair
-      }))
-    };
-
-    ws.send(JSON.stringify(subscribeMsg));
-
-    // Heartbeat to keep the connection alive
-    setInterval(() => {
-      ws.send('ping');
-    }, 30000);
-  });
-
-  ws.on('message', (data) => {
+  const botId = setInterval(async () => {
     try {
-      const message = JSON.parse(data);
-      if (message.action === 'snapshot' && message.data && message.data.length > 0) {
-        const tickerData = message.data[0];
-        priceCache[tickerData.instId] = parseFloat(tickerData.lastPr);
+      const price = getPrice(pair);
+      if (!price) {
+        console.log(`[Bot] ${pair}: Price not available yet`);
+        return;
       }
-    } catch (error) {
-      console.error('Error parsing message:', error);
+
+      const trade = new Trade({
+        pair,
+        price,
+        volume: tradeVolume,
+        botGenerated: true,
+        timestamp: new Date()
+      });
+      await trade.save();
+
+      console.log(`[Bot] ${pair}: Executed simulated trade @ ${price}`);
+    } catch (err) {
+      console.error(`[Bot] ${pair}: Error simulating trade`, err);
     }
-  });
+  }, intervalSeconds * 1000);
 
-  ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
-  });
+  activeBots.set(pair, botId);
 
-  ws.on('close', () => {
-    console.log('WebSocket connection closed. Reconnecting...');
-    setTimeout(connectWebSocket, 5000);
-  });
-}
+  res.status(200).json({ message: `Bot started for ${pair}` });
+};
 
-function getPrice(pair) {
-  return priceCache[pair] || null;
-}
+/**
+ * Stop a trading bot
+ */
+exports.stopBot = (req, res) => {
+  const { pair } = req.body;
 
-module.exports = {
-  connectWebSocket,
-  getPrice
+  if (!pair || !activeBots.has(pair)) {
+    return res.status(400).json({ message: `No bot is running for ${pair}` });
+  }
+
+  clearInterval(activeBots.get(pair));
+  activeBots.delete(pair);
+
+  res.status(200).json({ message: `Bot stopped for ${pair}` });
+};
+
+/**
+ * List active bots
+ */
+exports.listBots = (req, res) => {
+  const bots = Array.from(activeBots.keys());
+  res.status(200).json({ activePairs: bots });
 };
