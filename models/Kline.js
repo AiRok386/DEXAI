@@ -1,67 +1,76 @@
+// models/Kline.js
+
 const mongoose = require('mongoose');
 
-// Kline (Candlestick) Schema
+// Kline (Candlestick) Schema for Bitget WebSocket
 const KlineSchema = new mongoose.Schema(
   {
     symbol: {
       type: String,
       required: true,
-      index: true, // Index the symbol for faster queries
-      uppercase: true, // Ensure the symbol is stored in uppercase
+      index: true,
+      uppercase: true,
       trim: true,
     },
+    interval: {
+      type: String, // E.g., '1m', '5m', '1h'
+      required: true,
+    },
     openTime: {
-      type: Date,
-      required: true, // The timestamp for when the Kline period starts
-    },
-    open: {
-      type: String, // The open price (received as a string)
-      required: true,
-    },
-    high: {
-      type: String, // The high price during the Kline period
-      required: true,
-    },
-    low: {
-      type: String, // The low price during the Kline period
-      required: true,
-    },
-    close: {
-      type: String, // The close price at the end of the Kline period
-      required: true,
-    },
-    volume: {
-      type: String, // The total volume during the Kline period
+      type: Date, // Start of candle
       required: true,
     },
     closeTime: {
-      type: Date,
-      required: true, // The timestamp for when the Kline period ends
+      type: Date, // End of candle
+      required: true,
     },
-    symbolInterval: {
+    open: {
       type: String,
-      required: true, // The interval (e.g., '1m', '5m', '1h')
+      required: true,
     },
-    source: {
+    high: {
       type: String,
-      default: 'Bitget', // Source is Bitget by default
-      trim: true,
+      required: true,
+    },
+    low: {
+      type: String,
+      required: true,
+    },
+    close: {
+      type: String,
+      required: true,
+    },
+    volume: {
+      type: String,
+      required: true,
     },
     tradeCount: {
-      type: Number, // The number of trades during the Kline period
+      type: Number, // Number of trades during this candle
       required: true,
     },
     isFinal: {
-      type: Boolean, // Whether the Kline is final (closed)
-      default: false,
+      type: Boolean,
+      default: false, // Whether the kline is final/closed
+    },
+    symbolInterval: {
+      type: String,
+      required: true, // e.g., 'BTCUSDT-1m'
+    },
+    source: {
+      type: String,
+      default: 'Bitget',
+      trim: true,
     },
   },
   {
-    timestamps: true, // Adds createdAt and updatedAt fields
+    timestamps: true, // Adds createdAt and updatedAt
   }
 );
 
-// Optional: Set TTL (Time To Live) for Kline data. Auto-delete after 24 hours (86400s).
+// Prevent duplicates for the same candle
+KlineSchema.index({ symbol: 1, interval: 1, openTime: 1 }, { unique: true });
+
+// Optional: Auto-delete after 24h (adjustable)
 KlineSchema.index({ openTime: 1 }, { expireAfterSeconds: 86400 });
 
 module.exports = mongoose.model('Kline', KlineSchema);
