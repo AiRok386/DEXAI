@@ -13,7 +13,12 @@ const redisClient = redis.createClient({
   port: 6379 // Replace with your Redis server port if different
 });
 
-// Promisify Redis commands
+// Ensure Redis client supports promises
+redisClient.on('error', (err) => {
+  console.error('Redis error:', err);
+});
+
+// Promisify Redis commands (correctly handle setex for async)
 const getAsync = promisify(redisClient.get).bind(redisClient);
 const setAsync = promisify(redisClient.setex).bind(redisClient); // Correct promisified version of setex
 
