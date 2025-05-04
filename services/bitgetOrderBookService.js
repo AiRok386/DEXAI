@@ -1,63 +1,86 @@
 // services/bitgetOrderBookService.js
 
 const WebSocket = require('ws');
-const Market = require('../models/Market'); // MongoDB model
+const Market = require('../models/Market'); // Your Mongoose model
 
-const BITGET_WS_URL = 'wss://ws.bitget.com/mix/v1/stream';
-const SYMBOL = 'btcusdt'; // Change this if needed
+const BITGET_WS_URL = 'wss://ws.bitget.com/spot/v1/stream';
 
-function connectOrderBookSocket() {
+// ✅ Symbols to subscribe (Bitget uses underscore notation like btc_usdt)
+const symbols = ['btc_usdt', 'eth_usdt', 'sol_usdt']; // Add more as needed
+
+// 📡 Subscribe to order book channel for each symbol
+function subscribeToOrderBook(ws, symbol) {
+  const subscribeMsg = {
+    op: 'subscribe',
+    args: [
+      {
+        channel: 'books',
+        instId: symbol,
+      },
+    ],
+  };
+  ws.send(JSON.stringify(subscribeMsg));
+}
+
+// 📥 Handle incoming WebSocket messages
+async function handleOrderBookMessage(message) {
+  try {
+    const parsed = JSON.parse(message);
+
+    // ✅ Confirm subscription
+    if (parsed.event === 'subscribe') {
+      console.log(`📡 Subscribed to ${parsed.arg.instId}`);
+      return;
+    }
+
+    // ✅ Process order book update
+    if (parsed?.arg?.channel === 'books' && parsed?.data?.length) {
+      const symbol = parsed.arg.instId.replace('_', '').toUpperCase(); // e.g., btc_usdt -> BTCUSDT
+      const data = parsed.data[0];
+
+      const topBids = (data.bids || []).slice(0, 10);
+      const topAsks = (data.asks || []).slice(0, 10);
+
+      // ✅ Save or update in MongoDB
+      await Market.findOneAndUpdate(
+        { symbol },
+        {
+          symbol,
+          orderBook: {
+            bids: topBids,
+            asks: topAsks,
+          },
+        },
+        { upsert: true }
+      );
+
+      console.log(`✅ Updated order book for ${symbol}`);
+    }
+  } catch (err) {
+    console.error('❌ Failed to process order book message:', err.message);
+  }
+}
+
+// 🔁 Start WebSocket connection and manage lifecycle
+function startOrderBookService() {
   const ws = new WebSocket(BITGET_WS_URL);
 
   ws.on('open', () => {
-    console.log('🔌 Bitget Order Book WebSocket connected');
-
-    const subscribeMessage = {
-      op: 'subscribe',
-      args: [
-        {
-          instType: 'SPOT',
-          channel: 'books',
-          instId: SYMBOL.toUpperCase()
-        }
-      ]
-    };
-
-    ws.send(JSON.stringify(subscribeMessage));
+    console.log('🔌 Connected to Bitget WebSocket');
+    symbols.forEach((symbol) => subscribeToOrderBook(ws, symbol));
   });
 
-  ws.on('message', async (data) => {
-    const parsed = JSON.parse(data);
-    const orderBook = parsed.data;
-
-    if (orderBook && orderBook.bids && orderBook.asks) {
-      try {
-        await Market.findOneAndUpdate(
-          { symbol: SYMBOL.toUpperCase() },
-          {
-            orderBook: {
-              bids: orderBook.bids.slice(0, 10), // top 10 levels
-              asks: orderBook.asks.slice(0, 10)
-            }
-          },
-          { upsert: true }
-        );
-        console.log('✅ Order book updated in DB');
-      } catch (err) {
-        console.error('❌ Failed to update order book in DB:', err.message);
-      }
-    }
-  });
-
-  ws.on('close', () => {
-    console.warn('⚠️ Bitget Order Book WebSocket closed. Reconnecting in 5s...');
-    setTimeout(connectOrderBookSocket, 5000);
-  });
+  ws.on('message', handleOrderBookMessage);
 
   ws.on('error', (err) => {
     console.error('❌ WebSocket error:', err.message);
-    ws.close();
+    ws.close(); // Close to trigger reconnect
+  });
+
+  ws.on('close', () => {
+    console.warn('⚠️ WebSocket closed. Reconnecting in 5s...');
+    setTimeout(startOrderBookService, 5000);
   });
 }
 
-module.exports = connectOrderBookSocket;
+module.exports = startOrderBookService;
