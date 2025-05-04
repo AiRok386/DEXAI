@@ -7,8 +7,8 @@ const BITGET_WS_URL = 'wss://ws.bitget.com/spot/v1/stream';
 // WebSocket instance
 let ws = null;
 
+// Function to connect to Bitget WebSocket and subscribe to channels
 function connectWebSocket() {
-  // Connect to Bitget WebSocket
   ws = new WebSocket(BITGET_WS_URL);
 
   ws.on('open', () => {
@@ -32,9 +32,9 @@ function connectWebSocket() {
   });
 }
 
+// Function to subscribe to the required WebSocket channels
 function subscribeToMarketData() {
   // Subscribe to market channels (OrderBook, Trades, and Klines)
-  // You can subscribe to more channels or symbols as needed
   ws.send(
     JSON.stringify({
       op: 'subscribe',
@@ -56,7 +56,7 @@ function subscribeToMarketData() {
   );
 }
 
-// Handle incoming WebSocket messages
+// Function to handle incoming WebSocket messages
 function handleIncomingData(data) {
   if (data.arg && data.arg.channel) {
     const { channel, instId } = data.arg;
