@@ -1,69 +1,85 @@
-// trading.socket.js
+// sockets/trading.socket.js
 
-const OrderBook = require('../utils/orderbook.util'); // optional: use your own order book system
+const WebSocket = require('ws');
 const { broadcastPriceUpdate, broadcastDepthUpdate } = require('../utils/websocket.util');
 
-// Simulate broadcasting
-broadcastPriceUpdate(io, { pair: 'BTC/USDT', price: 27500.43, timestamp: Date.now() });
+// Bitget WebSocket Endpoint
+const BITGET_WS_URL = 'wss://ws.bitget.com/spot/v1/stream';
 
-// Store active sockets for broadcasting
-const connectedUsers = new Set();
+// Tokens you want to stream (top tokens can be dynamically added later)
+const tradingPairs = ['BTCUSDT', 'ETHUSDT']; // Add more if needed
 
 module.exports = (io) => {
-    io.on('connection', (socket) => {
-        console.log('🔌 New trader connected:', socket.id);
-        connectedUsers.add(socket);
+  io.on('connection', (socket) => {
+    console.log('🔌 New trader connected:', socket.id);
 
-        // Listen for new order
-        socket.on('new_order', (order) => {
-            console.log('📥 New order:', order);
+    // Setup Bitget WebSocket connection
+    const ws = new WebSocket(BITGET_WS_URL);
 
-            // Here you’d validate and store the order in your DB
-            // Optionally: match the order with an orderbook
-            const updatedPrice = simulatePriceChange(order);
+    ws.on('open', () => {
+      console.log('✅ Connected to Bitget WebSocket');
 
-            // Broadcast new price to all users
-            broadcastPriceUpdate(io, updatedPrice);
-        });
+      const args = [];
 
-        // Listen for cancel order
-        socket.on('cancel_order', (orderId) => {
-            console.log('❌ Cancel order:', orderId);
-            // TODO: Remove from DB/orderbook and notify client
-        });
+      tradingPairs.forEach((symbol) => {
+        args.push({ instType: 'SPOT', channel: 'trade', instId: symbol });
+        args.push({ instType: 'SPOT', channel: 'depth5', instId: symbol });
+      });
 
-        // Simulate depth updates
-        socket.on('get_depth', (pair) => {
-            const fakeDepth = generateFakeDepth(pair);
-            socket.emit('depth_update', fakeDepth);
-        });
-
-        socket.on('disconnect', () => {
-            console.log('❎ Trader disconnected:', socket.id);
-            connectedUsers.delete(socket);
-        });
+      ws.send(JSON.stringify({
+        op: 'subscribe',
+        args
+      }));
     });
+
+    ws.on('message', (data) => {
+      try {
+        const msg = JSON.parse(data);
+
+        if (msg.arg?.channel === 'trade') {
+          const [trade] = msg.data || [];
+          if (trade) {
+            const payload = {
+              pair: msg.arg.instId,
+              price: parseFloat(trade.p),
+              qty: parseFloat(trade.sz),
+              timestamp: trade.ts,
+              side: trade.side, // 'buy' or 'sell'
+            };
+            io.emit('tradeUpdate', payload);
+            broadcastPriceUpdate(io, payload);
+          }
+        }
+
+        if (msg.arg?.channel === 'depth5') {
+          const { bids, asks, ts } = msg.data || {};
+          if (bids && asks) {
+            const depth = {
+              pair: msg.arg.instId,
+              bids: bids.map(([price, qty]) => [parseFloat(price), parseFloat(qty)]),
+              asks: asks.map(([price, qty]) => [parseFloat(price), parseFloat(qty)]),
+              timestamp: ts
+            };
+            socket.emit('depth_update', depth);
+            broadcastDepthUpdate(io, depth);
+          }
+        }
+      } catch (err) {
+        console.error('❌ Failed to process Bitget WebSocket message:', err.message);
+      }
+    });
+
+    ws.on('close', () => {
+      console.log('❌ Bitget WebSocket closed');
+    });
+
+    ws.on('error', (error) => {
+      console.error('❌ Bitget WebSocket error:', error);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('❎ Trader disconnected:', socket.id);
+      ws.close();
+    });
+  });
 };
-
-// Simulate price change logic (replace with real engine)
-function simulatePriceChange(order) {
-    const basePrice = 100 + Math.random() * 10;
-    return {
-        pair: order.pair || 'BTC/USDT',
-        price: parseFloat(basePrice.toFixed(2)),
-        timestamp: Date.now(),
-    };
-}
-
-// Mock market depth generator
-function generateFakeDepth(pair) {
-    const bids = [], asks = [];
-    const base = 100;
-
-    for (let i = 0; i < 10; i++) {
-        bids.push([parseFloat((base - i * 0.5).toFixed(2)), (10 + i)]);
-        asks.push([parseFloat((base + i * 0.5).toFixed(2)), (10 + i)]);
-    }
-
-    return { pair, bids, asks };
-}
