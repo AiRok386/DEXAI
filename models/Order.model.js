@@ -1,21 +1,21 @@
+// models/Order.model.js
+
 const mongoose = require('mongoose');
 
-const orderSchema = new mongoose.Schema({
- symbol: { type: String, required: true, unique: true },
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  type: { type: String, enum: ['buy', 'sell'], required: true },
-  orderType: { type: String, enum: ['limit', 'market'], required: true },
-  tokenSymbol: { type: String, required: true },
-  pair: { type: String, required: true },
+const OrderSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  symbol: { type: String, required: true },
+  side: { type: String, enum: ['buy', 'sell'], required: true },
   price: { type: Number, required: true },
-  amount: { type: Number, required: true },
+  quantity: { type: Number, required: true },
+  filledQuantity: { type: Number, default: 0 },
+  status: {
+    type: String,
+    enum: ['open', 'filled', 'cancelled', 'partial'],
+    default: 'open',
+  },
+  type: { type: String, enum: ['limit', 'market'], required: true },
   createdAt: { type: Date, default: Date.now },
-  filledAmount: { type: Number, default: 0 },
-  bids: [{ price: Number, quantity: Number }],
-  asks: [{ price: Number, quantity: Number }],
-  ts: { type: Date }, // Timestamp from Bitget
-  checksum: { type: Number }
-  status: { type: String, enum: ['open', 'filled', 'cancelled', 'partial'], default: 'open' }
-}, { timestamps: true });
+});
 
-module.exports = mongoose.models.Order || mongoose.model('Order', orderSchema);
+module.exports = mongoose.model('Order', OrderSchema);
