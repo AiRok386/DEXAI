@@ -1,11 +1,10 @@
-// services/bitgetWebSocket.js
-
 const WebSocket = require('ws');
 const { parseTradeData, parseOrderBookData, parseKlineMessage, parseMarketData } = require('../utils/parseHelpers');
 const Trade = require('../models/Trade');
 const OrderBook = require('../models/OrderBook');
 const Kline = require('../models/Kline');
 const Market = require('../models/Market');
+const socketIO = require('socket.io');
 
 // WebSocket URL for Bitget (updated)
 const wsUrl = 'wss://ws.bitget.com/v2/ws/public';
@@ -20,9 +19,19 @@ const tradingPairs = [
 // Cache to store the most recent price for each pair
 let priceCache = {};
 
+// Create WebSocket server for Socket.IO
+let io;
+const createSocketServer = (server) => {
+  io = socketIO(server);
+  console.log('Socket.IO server running...');
+};
+
+// WebSocket client
+let ws;
+
 // Function to connect to the WebSocket
 function connectWebSocket() {
-  const ws = new WebSocket(wsUrl);
+  ws = new WebSocket(wsUrl);
 
   // When WebSocket connection opens
   ws.on('open', () => {
@@ -62,6 +71,11 @@ function connectWebSocket() {
         const marketData = parseMarketData(tickerData);
         const newMarketData = new Market(marketData);
         newMarketData.save().catch(err => console.error('Error saving market data:', err));
+
+        // Emit market data to frontend
+        if (io) {
+          io.emit('marketData', marketData);
+        }
       }
 
       // Handle trade data messages
@@ -69,6 +83,11 @@ function connectWebSocket() {
         const tradeData = parseTradeData(message.data);
         const newTrade = new Trade(tradeData);
         newTrade.save().catch(err => console.error('Error saving trade data:', err));
+
+        // Emit trade data to frontend
+        if (io) {
+          io.emit('tradeData', tradeData);
+        }
       }
 
       // Handle order book data messages
@@ -76,6 +95,11 @@ function connectWebSocket() {
         const orderBookData = parseOrderBookData(message.data);
         const newOrderBook = new OrderBook(orderBookData);
         newOrderBook.save().catch(err => console.error('Error saving order book data:', err));
+
+        // Emit order book data to frontend
+        if (io) {
+          io.emit('orderBookData', orderBookData);
+        }
       }
 
       // Handle kline (candlestick) data messages
@@ -83,6 +107,11 @@ function connectWebSocket() {
         const klineData = parseKlineMessage(message.data);
         const newKline = new Kline(klineData);
         newKline.save().catch(err => console.error('Error saving kline data:', err));
+
+        // Emit kline data to frontend
+        if (io) {
+          io.emit('klineData', klineData);
+        }
       }
     } catch (error) {
       console.error('Error parsing message:', error);
@@ -111,5 +140,6 @@ connectWebSocket();
 
 module.exports = {
   connectWebSocket,
+  createSocketServer,
   getPrice
 };
