@@ -2,51 +2,37 @@
 
 const mongoose = require('mongoose');
 
+// Define the schema for market data
 const MarketSchema = new mongoose.Schema({
   symbol: {
     type: String,
     required: true,
-    unique: true,
-    index: true // Faster querying
+    unique: true
   },
-  price: {
+  lastPrice: {
     type: Number,
     required: true
   },
-  priceChangePercent: {
+  high24h: {
     type: Number,
     required: true
   },
-  highPrice: {
+  low24h: {
     type: Number,
     required: true
   },
-  lowPrice: {
+  change24h: {
     type: Number,
     required: true
   },
-  volume: {
+  volume24h: {
     type: Number,
     required: true
   },
-  quoteVolume: {
-    type: Number,
-    required: true
-  },
-  openPrice: {
-    type: Number,
-    required: true
-  },
-  closeTime: {
-    type: Date,
-    required: true
-  },
-  updatedAt: {
+  timestamp: {
     type: Date,
     default: Date.now
   }
-}, {
-  timestamps: true // Automatically adds createdAt and updatedAt
 });
 
 module.exports = mongoose.model('Market', MarketSchema);
