@@ -7,11 +7,11 @@
  */
 function parseTradeData(tradeData) {
   return {
-    symbol: tradeData.symbol,  // Symbol for the trading pair (e.g., BTC-USDT)
-    price: parseFloat(tradeData.price),  // Price of the asset in the trade
-    quantity: parseFloat(tradeData.size),  // Quantity of the asset in the trade
-    time: new Date(tradeData.timestamp),  // Timestamp of the trade
-    isBuy: tradeData.side === 'buy',  // Whether the trade was a buy or sell
+    symbol: tradeData.symbol?.toUpperCase(),
+    price: parseFloat(tradeData.price),
+    quantity: parseFloat(tradeData.size),
+    time: new Date(tradeData.timestamp),
+    isBuy: tradeData.side === 'buy',
   };
 }
 
@@ -22,56 +22,80 @@ function parseTradeData(tradeData) {
  */
 function parseOrderBookData(orderBookData) {
   return {
-    symbol: orderBookData.symbol,  // Symbol for the trading pair (e.g., BTC-USDT)
+    symbol: orderBookData.symbol?.toUpperCase(),
     bids: orderBookData.bids.map(([price, quantity]) => ({
-      price: parseFloat(price),  // Bid price
-      quantity: parseFloat(quantity),  // Quantity for the bid
+      price: parseFloat(price),
+      quantity: parseFloat(quantity),
     })),
     asks: orderBookData.asks.map(([price, quantity]) => ({
-      price: parseFloat(price),  // Ask price
-      quantity: parseFloat(quantity),  // Quantity for the ask
+      price: parseFloat(price),
+      quantity: parseFloat(quantity),
     })),
-    time: new Date(orderBookData.timestamp),  // Timestamp of the order book update
+    time: new Date(orderBookData.timestamp),
   };
 }
 
 /**
- * Parse and format the incoming kline (candlestick) data from Bitget WebSocket.
- * @param {Object} klineData - The raw kline data from Bitget WebSocket.
- * @returns {Object} - The formatted kline data to store in the database.
+ * Converts interval string to milliseconds.
+ * Supports 'm', 'h', 'd' formats like '1m', '5m', '1h', '1d'
  */
-function parseKlineData(klineData) {
+function getIntervalMs(interval) {
+  const num = parseInt(interval);
+  if (interval.endsWith('m')) return num * 60 * 1000;
+  if (interval.endsWith('h')) return num * 60 * 60 * 1000;
+  if (interval.endsWith('d')) return num * 24 * 60 * 60 * 1000;
+  return 60 * 1000; // Default to 1m
+}
+
+/**
+ * Parse and format the incoming kline (candlestick) message from Bitget WebSocket.
+ * @param {Object} parsed - Parsed kline message with arg and data fields.
+ * @returns {Object} - The formatted kline document to store in the database.
+ */
+function parseKlineMessage(parsed) {
+  const { arg, data } = parsed;
+  const [timestamp, open, high, low, close, volume, quoteVolume] = data;
+  const interval = arg.instId.split('.')[0].split('candle')[1];
+  const symbol = arg.instId.split('.')[1];
+
   return {
-    symbol: klineData.symbol,  // Symbol for the trading pair (e.g., BTC-USDT)
-    open: parseFloat(klineData.open),  // Opening price for the candlestick
-    close: parseFloat(klineData.close),  // Closing price for the candlestick
-    high: parseFloat(klineData.high),  // Highest price during the candlestick
-    low: parseFloat(klineData.low),  // Lowest price during the candlestick
-    volume: parseFloat(klineData.volume),  // Volume traded during the candlestick
-    time: new Date(klineData.timestamp),  // Timestamp of the candlestick
+    symbol: symbol.toUpperCase(),
+    interval,
+    open: open,
+    high: high,
+    low: low,
+    close: close,
+    volume: volume,
+    openTime: new Date(Number(timestamp)),
+    closeTime: new Date(Number(timestamp) + getIntervalMs(interval)),
+    tradeCount: 0, // Not provided by Bitget
+    isFinal: true,
+    symbolInterval: `${symbol}_${interval}`,
+    source: 'Bitget',
   };
 }
 
 /**
- * Parse and format the incoming 24h market data from Bitget WebSocket.
- * @param {Object} marketData - The raw 24h market data from Bitget WebSocket.
- * @returns {Object} - The formatted 24h market data to store in the database.
+ * Parse and format the incoming 24h market ticker data from Bitget WebSocket.
+ * @param {Object} marketData - Raw 24h ticker data.
+ * @returns {Object} - Formatted 24h data object.
  */
 function parseMarketData(marketData) {
   return {
-    symbol: marketData.symbol,  // Symbol for the trading pair (e.g., BTC-USDT)
-    priceChange: parseFloat(marketData.priceChange),  // Price change over the last 24h
-    priceChangePercent: parseFloat(marketData.priceChangePercent),  // Price change percentage
-    highPrice: parseFloat(marketData.highPrice),  // 24h high price
-    lowPrice: parseFloat(marketData.lowPrice),  // 24h low price
-    volume: parseFloat(marketData.volume),  // 24h trading volume
-    openPrice: parseFloat(marketData.openPrice),  // 24h opening price
+    symbol: marketData.symbol?.toUpperCase(),
+    priceChange: parseFloat(marketData.priceChange),
+    priceChangePercent: parseFloat(marketData.priceChangePercent),
+    highPrice: parseFloat(marketData.highPrice),
+    lowPrice: parseFloat(marketData.lowPrice),
+    volume: parseFloat(marketData.volume),
+    openPrice: parseFloat(marketData.openPrice),
   };
 }
 
 module.exports = {
   parseTradeData,
   parseOrderBookData,
-  parseKlineData,
+  parseKlineMessage,
   parseMarketData,
+  getIntervalMs,
 };
