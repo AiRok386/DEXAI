@@ -1,8 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
+const http = require('http');
+const socketIo = require('socket.io');
 const WebSocket = require('ws');
-const socketIO = require('socket.io');
 const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
@@ -22,7 +23,7 @@ const adminBotRoutes = require('./routes/admin/bots');
 const botRoutes = require('./routes/bot.routes');
 const marketRoutes = require('./routes/market.routes');
 
-// WebSocket services
+// WebSocket services (Bitget)
 const connectBitgetTradeSocket = require('./services/bitgetTradeSocket');
 const connectBitgetKlineSocket = require('./services/bitgetKlineSocket');
 const connectBitgetOrderBookSocket = require('./services/bitgetOrderBookSocket');
@@ -30,7 +31,13 @@ const connectBitgetTickerSocket = require('./services/bitgetTickerSocket');
 
 // Initialize Express
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] }
+});
+
 const PORT = process.env.PORT || 5000;
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crypto-exchange';
 
 // Middleware setup
 app.set('trust proxy', 1); // For Render/NGINX reverse proxy support
@@ -67,30 +74,26 @@ app.get('/', (req, res) => {
 });
 
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI, {
+mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-.then(() => {
-  console.log('✅ MongoDB connected successfully.');
-})
-.catch((err) => {
-  console.error('❌ MongoDB connection error:', err);
-  process.exit(1);
-});
+  .then(() => {
+    console.log('✅ MongoDB connected successfully.');
+    // Start the services after DB connection
+    startPriceUpdater();         // Live price/volume updater
+    startTradeStream(io);        // Real-time trade feed
+    startOrderBookStream(io);    // Live order book
+    startKlineStream(io);        // Candlestick/Kline updates
+    startTickerStream(io);       // 24h price change/ticker updates
+    createSocketServer(io);      // Start WebSocket server
+  })
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err);
+    process.exit(1);
+  });
 
-// WebSocket server setup for real-time updates
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
-
-const io = socketIO(server);
-createSocketServer(io);  // Initialize socket server
-
-// Connect to Bitget WebSocket channels dynamically
-connectWebSocket();
-
-// Bitget WebSocket client for trade, orderbook, ticker, and kline data
+// WebSocket client for Bitget data streaming
 function connectWebSocket() {
   const bitgetWsUrl = process.env.BITGET_WS_URL;
   const wsClient = new WebSocket(bitgetWsUrl);
@@ -140,29 +143,28 @@ function subscribeToBitgetChannels(wsClient) {
   tokens.forEach((symbol) => {
     wsClient.send(JSON.stringify({
       op: 'subscribe',
-      args: [{ channel: `spot/orderBook`, instId: symbol }],
+      args: [{ channel: `spot/orderBook`, instId: symbol }],  // Orderbook
     }));
 
     wsClient.send(JSON.stringify({
       op: 'subscribe',
-      args: [{ channel: `spot/trade`, instId: symbol }],
+      args: [{ channel: `spot/trade`, instId: symbol }],       // Trades
     }));
 
     wsClient.send(JSON.stringify({
       op: 'subscribe',
-      args: [{ channel: `spot/kline`, instId: symbol, bar: '1m' }],
+      args: [{ channel: `spot/kline`, instId: symbol, bar: '1m' }], // Kline
     }));
 
     wsClient.send(JSON.stringify({
       op: 'subscribe',
-      args: [{ channel: `spot/ticker`, instId: symbol }],
+      args: [{ channel: `spot/ticker`, instId: symbol }],      // Ticker
     }));
   });
 }
 
 // Socket.IO server setup to send data to clients
 function createSocketServer(io) {
-  // Emit messages to clients from WebSocket listeners (real-time data)
   io.on('connection', (socket) => {
     console.log('Client connected to WebSocket');
 
@@ -172,3 +174,7 @@ function createSocketServer(io) {
     });
   });
 }
+
+// Start the price updater function (replaces previous example)
+const { startPriceUpdater } = require('./utils/priceUpdater');
+startPriceUpdater();
