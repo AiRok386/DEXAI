@@ -1,16 +1,49 @@
 const mongoose = require('mongoose');
 
-// Define the schema for the trade data
-const tradeSchema = new mongoose.Schema({
-  symbol: { type: String, required: true }, // The trading pair symbol (e.g., BTC-USDT)
-  tradeId: { type: String, required: true, unique: true }, // Unique trade ID
-  price: { type: Number, required: true }, // The price at which the trade was executed
-  volume: { type: Number, required: true }, // The volume of the trade
-  side: { type: String, enum: ['buy', 'sell'], required: true }, // Whether the trade was a buy or sell
-  timestamp: { type: Date, default: Date.now }, // Time when the trade occurred
-});
+// Trade Schema
+const TradeSchema = new mongoose.Schema(
+  {
+    symbol: {
+      type: String,
+      required: true,
+      index: true,  // Index the symbol for faster queries
+      uppercase: true,  // Ensure the symbol is stored in uppercase
+      trim: true,
+    },
+    price: {
+      type: String, // The price is stored as a string (received from Bitget)
+      required: true,
+    },
+    quantity: {
+      type: String, // The quantity is stored as a string (received from Bitget)
+      required: true,
+    },
+    side: {
+      type: String, // 'buy' or 'sell'
+      required: true,
+      enum: ['buy', 'sell'], // Only allow 'buy' or 'sell' values
+    },
+    tradeId: {
+      type: String,
+      required: true,
+      unique: true, // Ensure tradeId is unique to avoid duplicate records
+    },
+    timestamp: {
+      type: Date,
+      required: true, // The timestamp when the trade happened
+    },
+    source: {
+      type: String,
+      default: 'Bitget', // Source is Bitget by default
+      trim: true,
+    },
+  },
+  {
+    timestamps: true, // Adds createdAt and updatedAt fields
+  }
+);
 
-// Create the model based on the schema
-const Trade = mongoose.model('Trade', tradeSchema);
+// Optional: Set TTL (Time To Live) for trades. Auto-delete after 24 hours (86400s).
+TradeSchema.index({ timestamp: 1 }, { expireAfterSeconds: 86400 });
 
-module.exports = Trade;
+module.exports = mongoose.model('Trade', TradeSchema);
