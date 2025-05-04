@@ -91,6 +91,9 @@ async function startServer() {
     console.error('❌ Failed to start server:', err);
   }
 }
+const connectToBitget = require('./services/bitgetSocketService');
+
+connectToBitget(); // Start Bitget WebSocket connection
 
 // Start the server
 startServer();
