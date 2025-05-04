@@ -1,36 +1,16 @@
 const mongoose = require('mongoose');
 
+// Define the schema for the trade data
 const tradeSchema = new mongoose.Schema({
-    pair: {
-        type: String,
-        required: true, // Example: "BTC/USDT"
-    },
-    price: {
-        type: Number,
-        required: true,
-    },
-    amount: {
-        type: Number,
-        required: true,
-    },
-    side: {
-        type: String,
-        enum: ['buy', 'sell'],
-        required: true,
-    },
-    userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User', // Optional: ref if user-triggered
-        default: null,
-    },
-    isBotTrade: {
-        type: Boolean,
-        default: false,
-    },
-    timestamp: {
-        type: Date,
-        default: Date.now,
-    }
-}, { timestamps: true });
+  symbol: { type: String, required: true }, // The trading pair symbol (e.g., BTC-USDT)
+  tradeId: { type: String, required: true, unique: true }, // Unique trade ID
+  price: { type: Number, required: true }, // The price at which the trade was executed
+  volume: { type: Number, required: true }, // The volume of the trade
+  side: { type: String, enum: ['buy', 'sell'], required: true }, // Whether the trade was a buy or sell
+  timestamp: { type: Date, default: Date.now }, // Time when the trade occurred
+});
 
-module.exports = mongoose.model('Trade', tradeSchema);
+// Create the model based on the schema
+const Trade = mongoose.model('Trade', tradeSchema);
+
+module.exports = Trade;
