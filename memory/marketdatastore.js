@@ -1,12 +1,10 @@
-// memory/marketdatastore.js
-
 const WebSocket = require('ws');
 
-// Create a reusable store
+// Create a reusable store for market data
 class MarketDataStore {
   constructor() {
     this.marketData = {}; // Holds live data in memory
-    this.expirationTime = 15 * 1000; // 15 seconds
+    this.expirationTime = 15 * 1000; // 15 seconds expiration time for the data
     this.ws = null;
     this.subscribedSymbols = new Set();
   }
@@ -15,9 +13,11 @@ class MarketDataStore {
   start(pairs = []) {
     if (!pairs.length) return;
 
+    // Establish WebSocket connection to Bitget
     this.ws = new WebSocket('wss://ws.bitget.com/v2/ws/public');
 
     this.ws.on('open', () => {
+      // Prepare subscription payload to subscribe to ticker channels for all pairs
       const subscription = {
         op: 'subscribe',
         args: pairs.map((symbol) => ({
@@ -26,8 +26,8 @@ class MarketDataStore {
           instId: symbol,
         })),
       };
-      this.ws.send(JSON.stringify(subscription));
-      pairs.forEach((s) => this.subscribedSymbols.add(s));
+      this.ws.send(JSON.stringify(subscription)); // Send the subscription request
+      pairs.forEach((s) => this.subscribedSymbols.add(s)); // Add pairs to the subscribed set
       console.log('[Bitget WS] Subscribed to:', pairs);
     });
 
@@ -39,11 +39,13 @@ class MarketDataStore {
           return;
         }
 
+        // Handle ticker data
         if (msg.arg && msg.arg.channel === 'ticker' && msg.data && msg.data.length) {
           const data = msg.data[0];
           const symbol = data.instId;
           const now = Date.now();
 
+          // Prepare market snapshot
           const marketSnapshot = {
             symbol,
             price: parseFloat(data.lastPr),
@@ -52,6 +54,7 @@ class MarketDataStore {
             timestamp: now,
           };
 
+          // Store the data in memory
           this.set(symbol, marketSnapshot);
         }
       } catch (err) {
@@ -59,49 +62,52 @@ class MarketDataStore {
       }
     });
 
+    // Handle WebSocket close event
     this.ws.on('close', () => {
       console.log('[Bitget WS] Connection closed.');
-      this.subscribedSymbols.clear();
+      this.subscribedSymbols.clear(); // Clear the subscribed symbols on close
     });
 
+    // Handle WebSocket error event
     this.ws.on('error', (err) => {
       console.error('[Bitget WS] Connection error:', err.message);
     });
   }
 
-  // Set data in memory
+  // Set data in memory (with timestamp)
   set(symbol, data) {
     const timestamp = Date.now();
     this.marketData[symbol] = { ...data, timestamp };
   }
 
-  // Get fresh data
+  // Get fresh data from memory (if not expired)
   get(symbol) {
     const data = this.marketData[symbol];
-    if (!data) return null;
+    if (!data) return null; // Return null if data is not available
 
+    // Check if data has expired (older than expiration time)
     if (Date.now() - data.timestamp > this.expirationTime) {
-      delete this.marketData[symbol];
+      delete this.marketData[symbol]; // Delete expired data
       return null;
     }
     return data;
   }
 
-  // Clear all memory cache
+  // Clear all cached data in memory
   clear() {
     this.marketData = {};
   }
 
-  // Get all cached data
+  // Get all cached data (for monitoring or debugging)
   getAll() {
     return this.marketData;
   }
 }
 
-// Create single instance
+// Create and export the single instance of MarketDataStore
 const marketDataStore = new MarketDataStore();
 
-// Start WebSocket for top symbols (e.g., BTCUSDT, ETHUSDT)
+// Start WebSocket and subscribe to top symbols (e.g., BTCUSDT, ETHUSDT)
 marketDataStore.start([
   'BTCUSDT',
   'ETHUSDT',
