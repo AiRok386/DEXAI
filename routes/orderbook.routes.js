@@ -1,15 +1,21 @@
+// routes/orderbook.routes.js
+
 const express = require('express');
 const router = express.Router();
 const redis = require('redis');
 const { promisify } = require('util');
-const axios = require('axios');
 const WebSocket = require('ws');
 const OrderBook = require('../models/OrderBook');
 
 // Redis client setup
-const redisClient = redis.createClient();
+const redisClient = redis.createClient({
+  host: 'localhost', // Replace with your Redis server host
+  port: 6379 // Replace with your Redis server port if different
+});
+
+// Promisify Redis commands
 const getAsync = promisify(redisClient.get).bind(redisClient);
-const setAsync = promisify(redisClient.setex).bind(redisClient); // with expiry
+const setAsync = promisify(redisClient.setex).bind(redisClient); // Correct promisified version of setex
 
 // WebSocket URL for Bitget's Spot API
 const BITGET_WS_URL = 'wss://ws.bitget.com/spot/v1/stream';
