@@ -96,4 +96,10 @@ const connectToBitget = require('./services/bitgetSocketService');
 connectToBitget(); // Start Bitget WebSocket connection
 
 // Start the server
+
+// server.js
+
+// existing code...
+require('./services/bitgetSocket'); // <-- add this line after MongoDB connection
+
 startServer();
