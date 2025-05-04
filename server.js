@@ -88,5 +88,10 @@ const connectOrderBookSocket = require('./services/bitgetOrderBookService');
 connectOrderBookSocket();
 
 // Boot the backend
+const { startUpdater } = require('./Jobs/dataUpdater');
+
+// Start updating market data
+startUpdater();
+
 
 startServer();
