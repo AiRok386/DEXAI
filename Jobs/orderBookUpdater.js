@@ -1,77 +1,83 @@
-const axios = require('axios');
+// Jobs/orderBookUpdater.js
+
+const WebSocket = require('ws');
 const OrderBook = require('../models/OrderBook');
+const { topPairs } = require('../config/constants'); // Lowercase: ['btcusdt', 'ethusdt', ...]
 
-// List of allowed trading pairs (Top 15)
-const allowedSymbols = [
-  'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
-  'DOGEUSDT', 'PEPEUSDT', 'SUIUSDT', 'ADAUSDT', 'TRXUSDT',
-  'TONUSDT', 'LTCUSDT', 'AVAXUSDT', 'SHIBUSDT', 'DOTUSDT'
-];
+// In-memory cache (optional)
+const orderBookCache = {};
 
-async function fetchAndUpdateOrderBooks() {
-  for (const symbol of allowedSymbols) {
-    try {
-      const response = await axios.get(`https://api.binance.com/api/v3/depth`, {
-        params: {
-          symbol: symbol,
-          limit: 20 // Limit to 20 bids/asks
-        }
-      });
+// Convert topPairs to Bitget's format: BTCUSDT → btcusdt_spot
+const bitgetSymbols = topPairs.map(pair => `${pair}_spbl`);
 
-      const orderBookData = {
+// Bitget WebSocket URL
+const bitgetWSUrl = 'wss://ws.bitget.com/spot/v1/stream';
+
+// Start WebSocket connection
+function startOrderBookUpdater() {
+  const ws = new WebSocket(bitgetWSUrl);
+
+  ws.on('open', () => {
+    console.log('✅ Connected to Bitget WebSocket (OrderBook)...');
+
+    // Subscribe to depth data for each trading pair
+    const subscribeMsg = {
+      op: 'subscribe',
+      args: bitgetSymbols.map(symbol => ({
+        channel: `depth5`,
+        instId: symbol
+      }))
+    };
+
+    ws.send(JSON.stringify(subscribeMsg));
+  });
+
+  ws.on('message', async (data) => {
+    const parsed = JSON.parse(data);
+
+    if (parsed?.event === 'error') {
+      console.error('❌ Subscription error:', parsed);
+      return;
+    }
+
+    if (parsed?.action === 'snapshot' && parsed?.arg?.channel === 'depth5') {
+      const { arg, data: [orderData] } = parsed;
+
+      const symbol = arg.instId.replace('_spbl', '').toUpperCase(); // Format: btcusdt → BTCUSDT
+
+      const formattedOrderBook = {
         symbol,
-        bids: response.data.bids,
-        asks: response.data.asks,
-        lastUpdateId: response.data.lastUpdateId
+        bids: orderData.bids.map(([price, qty]) => ({ price: parseFloat(price), quantity: parseFloat(qty) })),
+        asks: orderData.asks.map(([price, qty]) => ({ price: parseFloat(price), quantity: parseFloat(qty) })),
+        ts: new Date(parseInt(orderData.ts)),
+        checksum: orderData.checksum
       };
 
+      // Optional: store in memory
+      orderBookCache[symbol] = formattedOrderBook;
+
       // Save to MongoDB
-      const newOrderBook = new OrderBook(orderBookData);
-      await newOrderBook.save();
-
-      console.log(`✅ Order book for ${symbol} updated successfully.`);
-    } catch (error) {
-      console.error(`❌ Error updating order book for ${symbol}:`, error.message);
+      try {
+        await OrderBook.findOneAndUpdate(
+          { symbol },
+          { $set: formattedOrderBook },
+          { upsert: true, new: true }
+        );
+        console.log(`✅ Order book updated: ${symbol}`);
+      } catch (err) {
+        console.error(`❌ DB update error (${symbol}):`, err.message);
+      }
     }
-  }
-}
+  });
 
-// Start the background job to update the order book every 10-15 seconds
-function startOrderBookUpdater() {
-  fetchAndUpdateOrderBooks(); // Initial fetch
-  setInterval(fetchAndUpdateOrderBooks, 10000); // Every 10 seconds
-  console.log('🔁 Order book updater started (every 10 seconds).');
-}
+  ws.on('close', () => {
+    console.warn('⚠️ WebSocket closed. Reconnecting in 5s...');
+    setTimeout(startOrderBookUpdater, 5000);
+  });
 
-try {
-  // Attempt to fetch data from Binance API
-  const response = await axios.get(`${BINANCE_API_URL}?symbol=${symbol}&limit=5`);
-  const orderBookData = response.data;
-
-  if (!orderBookData.bids || !orderBookData.asks) {
-    throw new Error('Invalid order book data received from Binance');
-  }
-
-  const formattedData = {
-    symbol,
-    bids: orderBookData.bids,
-    asks: orderBookData.asks,
-    updatedAt: new Date(),
-  };
-
-  // Save to MongoDB
-  await OrderBook.findOneAndUpdate(
-    { symbol: formattedData.symbol },
-    { $set: formattedData },
-    { upsert: true, new: true }
-  );
-
-  // Cache data in Redis for 10 seconds
-  redisClient.setex(symbol, 10, JSON.stringify(formattedData));
-
-  console.log(`✅ Updated and cached order book for ${symbol}`);
-} catch (error) {
-  console.error(`❌ Error processing order book for ${symbol}:`, error.message);
+  ws.on('error', (err) => {
+    console.error('❌ WebSocket error:', err.message);
+  });
 }
 
 module.exports = startOrderBookUpdater;
