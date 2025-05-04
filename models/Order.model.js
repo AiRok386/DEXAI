@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
+ symbol: { type: String, required: true, unique: true },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   type: { type: String, enum: ['buy', 'sell'], required: true },
   orderType: { type: String, enum: ['limit', 'market'], required: true },
@@ -10,6 +11,10 @@ const orderSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now },
   filledAmount: { type: Number, default: 0 },
+  bids: [{ price: Number, quantity: Number }],
+  asks: [{ price: Number, quantity: Number }],
+  ts: { type: Date }, // Timestamp from Bitget
+  checksum: { type: Number }
   status: { type: String, enum: ['open', 'filled', 'cancelled', 'partial'], default: 'open' }
 }, { timestamps: true });
 
