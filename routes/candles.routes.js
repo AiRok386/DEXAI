@@ -4,9 +4,11 @@ const express = require('express');
 const router = express.Router();
 const Kline = require('../models/Kline');
 
-// @route   GET /api/candles/:symbol/:interval
-// @desc    Get the latest 100 candlestick data from MongoDB for given symbol and interval
-// @example /api/candles/BTCUSDT/1m
+/**
+ * @route   GET /api/candles/:symbol/:interval
+ * @desc    Get the latest 100 candlestick entries for a given symbol and interval
+ * @example /api/candles/BTCUSDT/1m
+ */
 router.get('/:symbol/:interval', async (req, res) => {
   const { symbol, interval } = req.params;
 
@@ -15,7 +17,7 @@ router.get('/:symbol/:interval', async (req, res) => {
       symbol: symbol.toUpperCase(),
       interval: interval
     })
-      .sort({ openTime: -1 })
+      .sort({ openTime: -1 })  // Sort by newest first
       .limit(100);
 
     if (!klines.length) {
@@ -24,7 +26,7 @@ router.get('/:symbol/:interval', async (req, res) => {
 
     res.json(klines);
   } catch (error) {
-    console.error(`❌ Error fetching Kline data for ${symbol}:`, error.message);
+    console.error(`❌ Error fetching candlestick data for ${symbol}:`, error.message);
     res.status(500).json({ error: 'Failed to fetch candlestick data' });
   }
 });
