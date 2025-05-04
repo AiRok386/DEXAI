@@ -1,4 +1,4 @@
-// server.js (Optimized & error-handled backend with Binance REST API)
+// server.js (Updated to use Bitget WebSocket API instead of Binance REST API)
 
 require('dotenv').config();
 const express = require('express');
@@ -7,11 +7,9 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const ipBlocker = require('./middlewares/ipblocker');  // Custom IP blocker middleware
-const { startBinanceUpdater } = require('./utils/binanceUpdater');  // In-memory market data fetcher
-const { fetchAndStoreData } = require('./services/binanceDataService');  // Periodic data storage from Binance
+const ipBlocker = require('./middlewares/ipblocker');
 
-// Routes for various parts of the app
+// All API route files
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const walletRoutes = require('./routes/wallet.routes');
@@ -25,28 +23,30 @@ const adminBotRoutes = require('./routes/admin/bots');
 const botRoutes = require('./routes/bot.routes');
 const marketRoutes = require('./routes/market.routes');
 
-// Set up Express app
+// Import Bitget WebSocket service
+const connectToBitget = require('./services/bitgetSocket');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Trust proxy for reverse proxies like Render
+// Trust proxy (important for platforms like Render)
 app.set('trust proxy', 1);
 
-// Middlewares
+// Middleware setup
 app.use(express.json());
 app.use(cors());
-app.use(ipBlocker);  // Block suspicious IP addresses
-app.use(morgan('combined'));  // Logging requests
+app.use(ipBlocker);
+app.use(morgan('combined'));
 
-// Apply rate-limiting to all API routes
+// Apply API rate limiting
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minute window
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests, please try again later.'
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  message: 'Too many requests from this IP, please try again after 15 minutes.'
 });
-app.use('/api/', apiLimiter);  // Apply rate limit middleware globally
+app.use('/api/', apiLimiter);
 
-// API Routes
+// Mount all API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/wallet', walletRoutes);
@@ -60,29 +60,24 @@ app.use('/admin/bots', adminBotRoutes);
 app.use('/api/bots', botRoutes);
 app.use('/api/market', marketRoutes);
 
-// Root Route (Check if the server is up)
+// Test route to confirm backend is live
 app.get('/', (req, res) => {
-  res.send('🟢 Backend with Binance Market Mirror is running');
+  res.send('🟢 Backend with Bitget Market Mirror is running');
 });
 
-// Connect MongoDB and start server
+// MongoDB and WebSocket startup logic
 async function startServer() {
   try {
-    // MongoDB connection
     await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true
     });
     console.log('✅ MongoDB connected successfully.');
 
-    // Start in-memory Binance market updater
-    startBinanceUpdater();  // Periodically fetch and update market data
+    // 🔌 Start Bitget WebSocket live feed
+    connectToBitget();
 
-    // Start periodic data fetch for DB storage (every 10 seconds)
-    fetchAndStoreData();
-    setInterval(fetchAndStoreData, 10000);  // every 10s
-
-    // Start express server
+    // Start Express server
     const server = http.createServer(app);
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
@@ -91,15 +86,5 @@ async function startServer() {
     console.error('❌ Failed to start server:', err);
   }
 }
-const connectToBitget = require('./services/bitgetSocketService');
-
-connectToBitget(); // Start Bitget WebSocket connection
-
-// Start the server
-
-// server.js
-
-// existing code...
-require('./services/bitgetSocket'); // <-- add this line after MongoDB connection
 
 startServer();
