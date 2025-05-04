@@ -40,21 +40,20 @@ const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crypto-exchange';
 
 // Middleware setup
-app.set('trust proxy', 1); // For Render/NGINX reverse proxy support
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cors());
 app.use(morgan('combined'));
-app.use(ipBlocker); // Block bad IPs
+app.use(ipBlocker);
 
-// Rate limiter to prevent abuse
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Max 100 requests per IP
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests, please try again later.'
 });
 app.use('/api/', apiLimiter);
 
-// All Routes
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/wallet', walletRoutes);
@@ -68,113 +67,39 @@ app.use('/admin/bots', adminBotRoutes);
 app.use('/api/bots', botRoutes);
 app.use('/api/market', marketRoutes);
 
-// Root API Check
+// Root check
 app.get('/', (req, res) => {
   res.send('🟢 Backend with Bitget Market Mirror is running');
 });
 
-// MongoDB connection
+// Connect to DB and start all services
 mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
   .then(() => {
     console.log('✅ MongoDB connected successfully.');
-    // Start the services after DB connection
-    startPriceUpdater();         // Live price/volume updater
-    startTradeStream(io);        // Real-time trade feed
-    startOrderBookStream(io);    // Live order book
-    startKlineStream(io);        // Candlestick/Kline updates
-    startTickerStream(io);       // 24h price change/ticker updates
-    createSocketServer(io);      // Start WebSocket server
+    startPriceUpdater();
+    connectBitgetTradeSocket(io);
+    connectBitgetKlineSocket(io);
+    connectBitgetOrderBookSocket(io);
+    connectBitgetTickerSocket(io);
+    createSocketServer(io);
   })
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err);
     process.exit(1);
   });
 
-// WebSocket client for Bitget data streaming
-function connectWebSocket() {
-  const bitgetWsUrl = process.env.BITGET_WS_URL;
-  const wsClient = new WebSocket(bitgetWsUrl);
-
-  wsClient.on('open', () => {
-    console.log('✅ Connected to Bitget WebSocket');
-
-    // Subscribe to Bitget WebSocket channels dynamically (for top tokens)
-    subscribeToBitgetChannels(wsClient);
-  });
-
-  wsClient.on('message', (data) => {
-    const parsedData = JSON.parse(data);
-
-    // Handle different WebSocket channels (trade, orderbook, kline, ticker)
-    if (parsedData.arg?.channel === 'spot/orderBook') {
-      console.log('Order Book Update:', parsedData);
-      io.emit('orderBookData', parsedData);
-    }
-    if (parsedData.arg?.channel === 'spot/trade') {
-      console.log('Trade Feed Update:', parsedData);
-      io.emit('tradeData', parsedData);
-    }
-    if (parsedData.arg?.channel === 'spot/kline') {
-      console.log('Kline Update:', parsedData);
-      io.emit('klineData', parsedData);
-    }
-    if (parsedData.arg?.channel === 'spot/ticker') {
-      console.log('Ticker Update:', parsedData);
-      io.emit('marketData', parsedData);
-    }
-  });
-
-  wsClient.on('close', () => {
-    console.log('❌ Disconnected from Bitget WebSocket');
-  });
-
-  wsClient.on('error', (error) => {
-    console.error('WebSocket error:', error);
-  });
-}
-
-// Function to subscribe to channels (orderbook, trades, kline, ticker)
-function subscribeToBitgetChannels(wsClient) {
-  const tokens = ['BTC-USDT', 'ETH-USDT', 'XRP-USDT', 'LTC-USDT', 'BCH-USDT', 'SOL-USDT', 'DOT-USDT', 'ADA-USDT', 'DOGE-USDT', 'SHIB-USDT', 'MATIC-USDT', 'LUNA-USDT', 'AVAX-USDT', 'LINK-USDT', 'TRX-USDT'];
-
-  tokens.forEach((symbol) => {
-    wsClient.send(JSON.stringify({
-      op: 'subscribe',
-      args: [{ channel: `spot/orderBook`, instId: symbol }],  // Orderbook
-    }));
-
-    wsClient.send(JSON.stringify({
-      op: 'subscribe',
-      args: [{ channel: `spot/trade`, instId: symbol }],       // Trades
-    }));
-
-    wsClient.send(JSON.stringify({
-      op: 'subscribe',
-      args: [{ channel: `spot/kline`, instId: symbol, bar: '1m' }], // Kline
-    }));
-
-    wsClient.send(JSON.stringify({
-      op: 'subscribe',
-      args: [{ channel: `spot/ticker`, instId: symbol }],      // Ticker
-    }));
-  });
-}
-
-// Socket.IO server setup to send data to clients
+// WebSocket listener
 function createSocketServer(io) {
   io.on('connection', (socket) => {
-    console.log('Client connected to WebSocket');
-
-    // Here you can listen to specific events from clients if needed
+    console.log('Client connected');
     socket.on('disconnect', () => {
-      console.log('Client disconnected from WebSocket');
+      console.log('Client disconnected');
     });
   });
 }
 
-// Start the price updater function (replaces previous example)
+// Price updater
 const { startPriceUpdater } = require('./utils/priceUpdater');
-startPriceUpdater();
