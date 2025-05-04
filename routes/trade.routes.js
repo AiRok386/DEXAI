@@ -1,36 +1,33 @@
-// routes/trades.routes.js
-
 const express = require('express');
-const axios = require('axios');
 const router = express.Router();
+const Trade = require('../models/Trade');  // Import the Trade model
 
-// GET /api/trades/:symbol?limit=10
-router.get('/:symbol', async (req, res) => {
-  const { symbol } = req.params;
-  const { limit = 10 } = req.query;
-
+// Route to get all trade data for all symbols
+router.get('/', async (req, res) => {
   try {
-    const response = await axios.get('https://api.binance.com/api/v3/trades', {
-      params: {
-        symbol: symbol.toUpperCase(),
-        limit,
-      },
-    });
-
-    const trades = response.data.map(trade => ({
-      id: trade.id,
-      price: trade.price,
-      qty: trade.qty,
-      time: trade.time,
-      isBuyerMaker: trade.isBuyerMaker,
-    }));
-
-    res.status(200).json(trades);
+    // Fetch all trade entries from the database
+    const trades = await Trade.find({});
+    res.json(trades);  // Return the trades as a JSON response
   } catch (error) {
-    console.error(`❌ Error fetching trades for ${symbol}:`, error.message);
-    res.status(500).json({ error: 'Failed to fetch recent trades' });
+    console.error('❌ Error fetching trades:', error);
+    res.status(500).json({ error: '❌ Failed to fetch trades' });
+  }
+});
+
+// Route to get trade data for a specific symbol (e.g., BTC-USDT)
+router.get('/:symbol', async (req, res) => {
+  const { symbol } = req.params;  // Get the symbol from the URL params
+  try {
+    // Fetch the trades for the specific symbol
+    const trades = await Trade.find({ symbol });
+    if (!trades || trades.length === 0) {
+      return res.status(404).json({ error: '❌ No trades found for symbol' });
+    }
+    res.json(trades);  // Return the trades for the symbol
+  } catch (error) {
+    console.error('❌ Error fetching trades:', error);
+    res.status(500).json({ error: '❌ Failed to fetch trades for symbol' });
   }
 });
 
 module.exports = router;
-
