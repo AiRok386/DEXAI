@@ -2,46 +2,34 @@
 
 const express = require('express');
 const router = express.Router();
-const redis = require('redis');
-const { promisify } = require('util');
+const { createClient } = require('redis');
 const WebSocket = require('ws');
-const OrderBook = require('../models/OrderBook');
 
-// Redis client setup
-const redisClient = redis.createClient({
-  host: 'localhost', // Replace with your Redis server host
-  port: 6379 // Replace with your Redis server port if different
-});
-
-// Ensure Redis client supports promises
-redisClient.on('error', (err) => {
-  console.error('Redis error:', err);
-});
-
-// Promisify Redis commands (correctly handle setex for async)
-const getAsync = promisify(redisClient.get).bind(redisClient);
-const setAsync = promisify(redisClient.setex).bind(redisClient); // Correct promisified version of setex
-
-// WebSocket URL for Bitget's Spot API
-const BITGET_WS_URL = 'wss://ws.bitget.com/spot/v1/stream';
-
-// WebSocket connection to Bitget
-const ws = new WebSocket(BITGET_WS_URL);
-
-// Allowed top 15 trading pairs
 const allowedSymbols = [
   'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
   'DOGEUSDT', 'PEPEUSDT', 'SUIUSDT', 'ADAUSDT', 'TRXUSDT',
   'TONUSDT', 'LTCUSDT', 'AVAXUSDT', 'SHIBUSDT', 'DOTUSDT'
 ];
 
-// Store order book data temporarily
+// In-memory cache for order books
 let orderBooksCache = {};
 
-// Listen for WebSocket messages from Bitget
+// Redis client setup (v4+ with promises)
+const redisClient = createClient();
+
+redisClient.on('error', (err) => {
+  console.error('Redis Client Error', err);
+});
+
+redisClient.connect(); // Async connection, but starts promise queue immediately
+
+// WebSocket setup
+const BITGET_WS_URL = 'wss://ws.bitget.com/spot/v1/stream';
+const ws = new WebSocket(BITGET_WS_URL);
+
 ws.on('open', () => {
-  console.log('Connected to Bitget WebSocket');
-  // Subscribe to the top 15 symbols for order book data
+  console.log('✅ Connected to Bitget WebSocket');
+
   allowedSymbols.forEach(symbol => {
     ws.send(JSON.stringify({
       op: 'subscribe',
@@ -50,31 +38,35 @@ ws.on('open', () => {
   });
 });
 
-// Handle incoming WebSocket messages
-ws.on('message', (message) => {
-  const parsedMessage = JSON.parse(message);
-  const { topic, data } = parsedMessage;
+ws.on('message', async (message) => {
+  try {
+    const parsed = JSON.parse(message);
+    const { topic, data } = parsed;
 
-  // Handle the order book data
-  if (topic && topic.startsWith('spot/orderbook:')) {
-    const symbol = topic.split(':')[1];
+    if (topic && topic.startsWith('spot/orderbook:')) {
+      const symbol = topic.split(':')[1];
 
-    if (allowedSymbols.includes(symbol)) {
-      const orderBookData = {
-        symbol,
-        bids: data.bids,
-        asks: data.asks,
-        lastUpdateId: data.lastUpdateId
-      };
+      if (allowedSymbols.includes(symbol)) {
+        const orderBookData = {
+          symbol,
+          bids: data?.bids || [],
+          asks: data?.asks || [],
+          lastUpdateId: data?.lastUpdateId || null,
+        };
 
-      // Update the cache and save it to Redis for quick access
-      orderBooksCache[symbol] = orderBookData;
-      setAsync(`orderbook:${symbol}`, 60, JSON.stringify(orderBookData)); // Cache for 60 seconds
+        // Update in-memory cache
+        orderBooksCache[symbol] = orderBookData;
+
+        // Save to Redis (60 seconds TTL)
+        await redisClient.setEx(`orderbook:${symbol}`, 60, JSON.stringify(orderBookData));
+      }
     }
+  } catch (err) {
+    console.error('❌ WebSocket message error:', err.message);
   }
 });
 
-// Route to get the latest order book for a specific symbol
+// Route: Get latest order book by symbol
 router.get('/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
 
@@ -83,34 +75,32 @@ router.get('/:symbol', async (req, res) => {
   }
 
   try {
-    // 1. Check Redis cache first
-    const cachedData = await getAsync(`orderbook:${symbol}`);
-    if (cachedData) {
-      return res.json(JSON.parse(cachedData));
+    // Try Redis cache first
+    const cached = await redisClient.get(`orderbook:${symbol}`);
+    if (cached) {
+      return res.json(JSON.parse(cached));
     }
 
-    // 2. If not cached, check the in-memory cache
+    // Fallback to in-memory cache
     if (orderBooksCache[symbol]) {
       return res.json(orderBooksCache[symbol]);
     }
 
-    // 3. If no data found, return error
     return res.status(404).json({ error: 'Order book data not available' });
-  } catch (error) {
-    console.error(`❌ Failed to fetch order book for ${symbol}:`, error.message);
-    res.status(500).json({ error: 'Internal server error while retrieving order book' });
+  } catch (err) {
+    console.error(`❌ Failed to fetch order book for ${symbol}:`, err.message);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Route to get all order books
+// Route: Get all available order books
 router.get('/', async (req, res) => {
   try {
-    // Fetch all order book entries from the in-memory cache
-    const allOrderBooks = Object.values(orderBooksCache);
-    res.status(200).json(allOrderBooks);
-  } catch (error) {
-    console.error('❌ Error fetching all order books:', error);
-    res.status(500).json({ error: '❌ Failed to fetch order books' });
+    const all = Object.values(orderBooksCache);
+    return res.status(200).json(all);
+  } catch (err) {
+    console.error('❌ Error fetching all order books:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch order books' });
   }
 });
 
