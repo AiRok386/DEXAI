@@ -8,6 +8,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const ipBlocker = require('./middlewares/ipblocker');
+const WebSocket = require('ws');  // WebSocket for Bitget API
 
 // Import all API route files
 const authRoutes = require('./routes/auth.routes');
@@ -61,49 +62,78 @@ app.get('/', (req, res) => {
   res.send('🟢 Backend with Bitget Market Mirror is running');
 });
 
-// Connect to Bitget WebSocket after DB connection
-const connectToBitget = require('./services/bitgetSocketService');
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => {
+  console.log('✅ MongoDB connected successfully.');
+})
+.catch((err) => {
+  console.error('❌ MongoDB connection error:', err);
+  process.exit(1);
+});
 
-// Start backend server + Bitget connection
-async function startServer() {
-  try {
-    await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
+// WebSocket connection to Bitget API
+const connectWebSocket = () => {
+  const bitgetWsUrl = process.env.BITGET_WS_URL;
+  const wsClient = new WebSocket(bitgetWsUrl);
+
+  wsClient.on('open', () => {
+    console.log('✅ Connected to Bitget WebSocket');
+    
+    // Subscribe to Bitget WebSocket channels (Order Book, Trades, Klines, Ticker)
+    const subscribeMessage = JSON.stringify({
+      "op": "subscribe",
+      "args": [
+        { "channel": "spot/orderBook", "instId": "BTC-USDT" },
+        { "channel": "spot/trade", "instId": "BTC-USDT" },
+        { "channel": "spot/kline", "instId": "BTC-USDT", "bar": "1m" },
+        { "channel": "spot/ticker", "instId": "BTC-USDT" }
+      ]
     });
-    console.log('✅ MongoDB connected successfully.');
 
-    // Connect to Bitget WebSocket streams
-    connectToBitget();
+    wsClient.send(subscribeMessage);
+  });
 
-    const server = http.createServer(app);
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-    });
-  } catch (err) {
-    console.error('❌ Failed to start server:', err);
-  }
-}
-const connectOrderBookSocket = require('./services/bitgetOrderBookService');
-connectOrderBookSocket();
+  wsClient.on('message', (data) => {
+    // Handle incoming WebSocket data
+    const parsedData = JSON.parse(data);
+    
+    // Process order book, trades, kline, and ticker data here
+    if (parsedData.arg?.channel === 'spot/orderBook') {
+      console.log('Order Book Update:', parsedData);
+      // Store order book data to MongoDB
+    }
+    if (parsedData.arg?.channel === 'spot/trade') {
+      console.log('Trade Feed Update:', parsedData);
+      // Store trade data to MongoDB
+    }
+    if (parsedData.arg?.channel === 'spot/kline') {
+      console.log('Kline Update:', parsedData);
+      // Store kline data to MongoDB
+    }
+    if (parsedData.arg?.channel === 'spot/ticker') {
+      console.log('Ticker Update:', parsedData);
+      // Store ticker data to MongoDB
+    }
+  });
 
-// Boot the backend
-const { startUpdater } = require('./Jobs/dataUpdater');
+  wsClient.on('close', () => {
+    console.log('❌ Disconnected from Bitget WebSocket');
+  });
 
-// Start updating market data
+  wsClient.on('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
+};
 
-// app.js or your main entry file
-
-const { connectWebSocket } = require('./services/bitgetWebSocket');
-
-// Initialize WebSocket connection
+// Start WebSocket connection
 connectWebSocket();
 
-// ... rest of your app initialization
-const { startPriceStream } = require('./controllers/priceController');
-
-startPriceStream(); // Start Bitget price tracking
-
-
-
-startServer();
+// Start backend server
+const server = http.createServer(app);
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
