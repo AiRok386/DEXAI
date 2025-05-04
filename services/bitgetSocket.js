@@ -1,47 +1,57 @@
-// services/bitgetSocket.js
-
 const WebSocket = require('ws');
+const Market = require('../models/Market');
 
-// Define the trading pairs you want to subscribe to (use lowercase and hyphen format)
-const tradingPairs = ['btcusdt', 'ethusdt', 'solusdt']; // Add more as needed
+const symbols = [
+  'btcusdt', 'ethusdt', 'bnbusdt', 'solusdt', 'xrpusdt',
+  'dogeusdt', 'pepeusdt', 'suiusdt', 'adausdt', 'trxusdt',
+  'tonusdt', 'ltcusdt', 'avaxusdt', 'shibusdt', 'dotusdt'
+];
 
-// Create WebSocket connection to Bitget public market data
-const ws = new WebSocket('wss://ws.bitget.com/mix/v1/stream');
+const bitgetWs = new WebSocket('wss://ws.bitget.com/spot/v1/stream');
 
-ws.on('open', () => {
-  console.log('✅ Connected to Bitget WebSocket');
+bitgetWs.on('open', () => {
+  console.log('✅ Bitget WebSocket connected');
 
-  // Subscribe to tickers for each pair
-  const subscriptions = tradingPairs.map(symbol => ({
-    op: 'subscribe',
-    args: [{
-      instType: 'SPOT',
-      channel: 'ticker',
-      instId: symbol.toUpperCase()
-    }]
+  const subs = symbols.map((symbol) => ({
+    instType: 'SPOT',
+    channel: 'ticker',
+    instId: symbol.toUpperCase()
   }));
 
-  subscriptions.forEach(sub => ws.send(JSON.stringify(sub)));
+  bitgetWs.send(JSON.stringify({
+    op: 'subscribe',
+    args: subs
+  }));
 });
 
-ws.on('message', (data) => {
-  const message = JSON.parse(data);
-  
-  if (message.arg && message.data) {
-    const symbol = message.arg.instId;
-    const price = message.data.last;
-    
-    console.log(`📈 ${symbol} price: ${price}`);
+bitgetWs.on('message', async (raw) => {
+  try {
+    const data = JSON.parse(raw);
 
-    // TODO: You can now update MongoDB or broadcast to frontend
+    if (data.action === 'snapshot' || data.action === 'update') {
+      const ticker = data.data?.[0];
+      if (!ticker || !ticker.instId) return;
+
+      const symbol = ticker.instId;
+      const price = parseFloat(ticker.lastPr);
+
+      await Market.findOneAndUpdate(
+        { symbol },
+        { $set: { price, updatedAt: new Date() } },
+        { upsert: true }
+      );
+
+      console.log(`📈 Updated ${symbol} = $${price}`);
+    }
+  } catch (error) {
+    console.error('❌ Bitget WS error:', error.message);
   }
 });
 
-ws.on('error', (err) => {
-  console.error('❌ Bitget WebSocket error:', err.message);
+bitgetWs.on('error', (err) => {
+  console.error('❌ WebSocket error:', err.message);
 });
 
-ws.on('close', () => {
-  console.warn('🔌 Bitget WebSocket closed. Trying to reconnect...');
-  setTimeout(() => require('./bitgetSocket'), 3000); // Reconnect
+bitgetWs.on('close', () => {
+  console.log('🔌 Bitget WebSocket disconnected');
 });
