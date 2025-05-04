@@ -1,16 +1,19 @@
-// routes/market.routes.js
-
 const express = require('express');
 const router = express.Router();
 const Market = require('../models/Market');
 const marketDataStore = require('../memory/marketdatastore');
-const { getLivePriceFromWebSocket, getOrderBookFromWebSocket, getTradesFromWebSocket, getKlinesFromWebSocket } = require('../services/bitgetService');
+const { 
+  getLivePriceFromWebSocket, 
+  getOrderBookFromWebSocket, 
+  getTradesFromWebSocket, 
+  getKlinesFromWebSocket 
+} = require('../services/bitgetService'); // Importing WebSocket helper methods
 
 // ✅ Fetch all market data stored in MongoDB (latest)
 router.get('/markets', async (req, res) => {
   try {
-    const marketData = await Market.find({}); // Get all market data from the database
-    res.json(marketData);
+    const marketData = await Market.find({}); // Get all market data from MongoDB
+    res.status(200).json(marketData);
   } catch (error) {
     console.error('❌ Error fetching market data:', error.message);
     res.status(500).json({ error: 'Failed to fetch market data' });
@@ -43,12 +46,12 @@ router.get('/:symbol', async (req, res) => {
   }
 });
 
-// ✅ Fetch latest order book for a symbol
+// ✅ Fetch latest order book for a symbol from Bitget WebSocket API
 router.get('/orderbook/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
   
   try {
-    const orderBook = await getOrderBookFromWebSocket(symbol); // Get order book via WebSocket
+    const orderBook = await getOrderBookFromWebSocket(symbol); // Get order book via WebSocket from Bitget
     if (!orderBook) {
       return res.status(404).json({ error: 'Order book data not available for this symbol' });
     }
@@ -59,12 +62,12 @@ router.get('/orderbook/:symbol', async (req, res) => {
   }
 });
 
-// ✅ Fetch recent trades for a symbol
+// ✅ Fetch recent trades for a symbol from Bitget WebSocket API
 router.get('/trades/:symbol', async (req, res) => {
   const symbol = req.params.symbol.toUpperCase();
   
   try {
-    const trades = await getTradesFromWebSocket(symbol); // Get trades via WebSocket
+    const trades = await getTradesFromWebSocket(symbol); // Get trades via WebSocket from Bitget
     if (!trades) {
       return res.status(404).json({ error: 'Trade data not available for this symbol' });
     }
@@ -75,12 +78,12 @@ router.get('/trades/:symbol', async (req, res) => {
   }
 });
 
-// ✅ Fetch recent candlesticks (klines) for a symbol and interval
+// ✅ Fetch recent candlesticks (klines) for a symbol and interval from Bitget WebSocket API
 router.get('/klines/:symbol/:interval', async (req, res) => {
   const { symbol, interval } = req.params;
 
   try {
-    const klines = await getKlinesFromWebSocket(symbol, interval); // Get klines via WebSocket
+    const klines = await getKlinesFromWebSocket(symbol, interval); // Get klines via WebSocket from Bitget
     if (!klines) {
       return res.status(404).json({ error: 'Kline data not available for this symbol' });
     }
@@ -91,8 +94,8 @@ router.get('/klines/:symbol/:interval', async (req, res) => {
   }
 });
 
-// ✅ Fetch live price for a symbol (from memory or WebSocket)
-router.get('/price/:symbol', (req, res) => {
+// ✅ Fetch live price for a symbol from memory or WebSocket
+router.get('/price/:symbol', async (req, res) => {
   const { symbol } = req.params;
   const data = marketDataStore.get(symbol.toUpperCase());
 
