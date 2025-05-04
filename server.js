@@ -1,16 +1,14 @@
-// server.js — Crypto Exchange Backend using Bitget WebSocket API
-
 require('dotenv').config();
 const express = require('express');
-const http = require('http');
 const mongoose = require('mongoose');
+const WebSocket = require('ws');
+const socketIO = require('socket.io');
 const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const ipBlocker = require('./middlewares/ipblocker');
-const WebSocket = require('ws');  // WebSocket for Bitget API
 
-// Import all API route files
+// Import routes
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const walletRoutes = require('./routes/wallet.routes');
@@ -23,6 +21,12 @@ const candlesRoutes = require('./routes/candles.routes');
 const adminBotRoutes = require('./routes/admin/bots');
 const botRoutes = require('./routes/bot.routes');
 const marketRoutes = require('./routes/market.routes');
+
+// WebSocket services
+const connectBitgetTradeSocket = require('./services/bitgetTradeSocket');
+const connectBitgetKlineSocket = require('./services/bitgetKlineSocket');
+const connectBitgetOrderBookSocket = require('./services/bitgetOrderBookSocket');
+const connectBitgetTickerSocket = require('./services/bitgetTickerSocket');
 
 // Initialize Express
 const app = express();
@@ -50,7 +54,7 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/trading', tradingRoutes);
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/ico', icoRoutes);
-app.use('/api/trades', tradesRoutes);
+app.use('/api/trades', tradeRoutes);
 app.use('/api/orderbook', orderbookRoutes);
 app.use('/api/candles', candlesRoutes);
 app.use('/admin/bots', adminBotRoutes);
@@ -75,48 +79,48 @@ mongoose.connect(process.env.MONGO_URI, {
   process.exit(1);
 });
 
-// WebSocket connection to Bitget API
-const connectWebSocket = () => {
+// WebSocket server setup for real-time updates
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
+
+const io = socketIO(server);
+createSocketServer(io);  // Initialize socket server
+
+// Connect to Bitget WebSocket channels dynamically
+connectWebSocket();
+
+// Bitget WebSocket client for trade, orderbook, ticker, and kline data
+function connectWebSocket() {
   const bitgetWsUrl = process.env.BITGET_WS_URL;
   const wsClient = new WebSocket(bitgetWsUrl);
 
   wsClient.on('open', () => {
     console.log('✅ Connected to Bitget WebSocket');
-    
-    // Subscribe to Bitget WebSocket channels (Order Book, Trades, Klines, Ticker)
-    const subscribeMessage = JSON.stringify({
-      "op": "subscribe",
-      "args": [
-        { "channel": "spot/orderBook", "instId": "BTC-USDT" },
-        { "channel": "spot/trade", "instId": "BTC-USDT" },
-        { "channel": "spot/kline", "instId": "BTC-USDT", "bar": "1m" },
-        { "channel": "spot/ticker", "instId": "BTC-USDT" }
-      ]
-    });
 
-    wsClient.send(subscribeMessage);
+    // Subscribe to Bitget WebSocket channels dynamically (for top tokens)
+    subscribeToBitgetChannels(wsClient);
   });
 
   wsClient.on('message', (data) => {
-    // Handle incoming WebSocket data
     const parsedData = JSON.parse(data);
-    
-    // Process order book, trades, kline, and ticker data here
+
+    // Handle different WebSocket channels (trade, orderbook, kline, ticker)
     if (parsedData.arg?.channel === 'spot/orderBook') {
       console.log('Order Book Update:', parsedData);
-      // Store order book data to MongoDB
+      io.emit('orderBookData', parsedData);
     }
     if (parsedData.arg?.channel === 'spot/trade') {
       console.log('Trade Feed Update:', parsedData);
-      // Store trade data to MongoDB
+      io.emit('tradeData', parsedData);
     }
     if (parsedData.arg?.channel === 'spot/kline') {
       console.log('Kline Update:', parsedData);
-      // Store kline data to MongoDB
+      io.emit('klineData', parsedData);
     }
     if (parsedData.arg?.channel === 'spot/ticker') {
       console.log('Ticker Update:', parsedData);
-      // Store ticker data to MongoDB
+      io.emit('marketData', parsedData);
     }
   });
 
@@ -127,13 +131,44 @@ const connectWebSocket = () => {
   wsClient.on('error', (error) => {
     console.error('WebSocket error:', error);
   });
-};
+}
 
-// Start WebSocket connection
-connectWebSocket();
+// Function to subscribe to channels (orderbook, trades, kline, ticker)
+function subscribeToBitgetChannels(wsClient) {
+  const tokens = ['BTC-USDT', 'ETH-USDT', 'XRP-USDT', 'LTC-USDT', 'BCH-USDT', 'SOL-USDT', 'DOT-USDT', 'ADA-USDT', 'DOGE-USDT', 'SHIB-USDT', 'MATIC-USDT', 'LUNA-USDT', 'AVAX-USDT', 'LINK-USDT', 'TRX-USDT'];
 
-// Start backend server
-const server = http.createServer(app);
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+  tokens.forEach((symbol) => {
+    wsClient.send(JSON.stringify({
+      op: 'subscribe',
+      args: [{ channel: `spot/orderBook`, instId: symbol }],
+    }));
+
+    wsClient.send(JSON.stringify({
+      op: 'subscribe',
+      args: [{ channel: `spot/trade`, instId: symbol }],
+    }));
+
+    wsClient.send(JSON.stringify({
+      op: 'subscribe',
+      args: [{ channel: `spot/kline`, instId: symbol, bar: '1m' }],
+    }));
+
+    wsClient.send(JSON.stringify({
+      op: 'subscribe',
+      args: [{ channel: `spot/ticker`, instId: symbol }],
+    }));
+  });
+}
+
+// Socket.IO server setup to send data to clients
+function createSocketServer(io) {
+  // Emit messages to clients from WebSocket listeners (real-time data)
+  io.on('connection', (socket) => {
+    console.log('Client connected to WebSocket');
+
+    // Here you can listen to specific events from clients if needed
+    socket.on('disconnect', () => {
+      console.log('Client disconnected from WebSocket');
+    });
+  });
+}
