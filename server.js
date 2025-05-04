@@ -1,4 +1,4 @@
-// server.js (Updated to use Bitget WebSocket API instead of Binance REST API)
+// server.js — Crypto Exchange Backend using Bitget WebSocket API
 
 require('dotenv').config();
 const express = require('express');
@@ -9,7 +9,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const ipBlocker = require('./middlewares/ipblocker');
 
-// All API route files
+// Import all API route files
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const walletRoutes = require('./routes/wallet.routes');
@@ -23,30 +23,26 @@ const adminBotRoutes = require('./routes/admin/bots');
 const botRoutes = require('./routes/bot.routes');
 const marketRoutes = require('./routes/market.routes');
 
-// Import Bitget WebSocket service
-const connectToBitget = require('./services/bitgetSocket');
-
+// Initialize Express
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Trust proxy (important for platforms like Render)
-app.set('trust proxy', 1);
-
 // Middleware setup
+app.set('trust proxy', 1); // For Render/NGINX reverse proxy support
 app.use(express.json());
 app.use(cors());
-app.use(ipBlocker);
 app.use(morgan('combined'));
+app.use(ipBlocker); // Block bad IPs
 
-// Apply API rate limiting
+// Rate limiter to prevent abuse
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
-  message: 'Too many requests from this IP, please try again after 15 minutes.'
+  max: 100, // Max 100 requests per IP
+  message: 'Too many requests, please try again later.'
 });
 app.use('/api/', apiLimiter);
 
-// Mount all API routes
+// All Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/wallet', walletRoutes);
@@ -60,12 +56,15 @@ app.use('/admin/bots', adminBotRoutes);
 app.use('/api/bots', botRoutes);
 app.use('/api/market', marketRoutes);
 
-// Test route to confirm backend is live
+// Root API Check
 app.get('/', (req, res) => {
   res.send('🟢 Backend with Bitget Market Mirror is running');
 });
 
-// MongoDB and WebSocket startup logic
+// Connect to Bitget WebSocket after DB connection
+const connectToBitget = require('./services/bitgetSocketService');
+
+// Start backend server + Bitget connection
 async function startServer() {
   try {
     await mongoose.connect(process.env.MONGO_URI, {
@@ -74,10 +73,9 @@ async function startServer() {
     });
     console.log('✅ MongoDB connected successfully.');
 
-    // 🔌 Start Bitget WebSocket live feed
+    // Connect to Bitget WebSocket streams
     connectToBitget();
 
-    // Start Express server
     const server = http.createServer(app);
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
@@ -87,4 +85,5 @@ async function startServer() {
   }
 }
 
+// Boot the backend
 startServer();
