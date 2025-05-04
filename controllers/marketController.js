@@ -1,62 +1,57 @@
-// controllers/marketController.js
+// controllers/marketController.js (Bitget WebSocket version)
 
-const Market = require('../models/Market');  // Ensure you're importing the correct model
-const fetchBinanceMarkets = require('../utils/fetchBinanceMarkets');  // This is a helper function to fetch Binance market data
+const Market = require('../models/Market');
+const OrderBook = require('../models/OrderBook');
+const Trade = require('../models/Trade');
+const Kline = require('../models/Kline');
 
-// This function will update all the market data from Binance
-async function updateAllMarkets(req, res) {
-  try {
-    // Fetch the latest market data from Binance
-    const data = await fetchBinanceMarkets();
-
-    // Create an array of promises for updating the database
-    const updates = data.map(async (item) => {
-      // Match the symbol against common asset pairs like USDT, BTC, ETH, BNB
-      const symbolParts = item.symbol.match(/^([A-Z]+)(USDT|BTC|ETH|BUSD|BNB)$/); // regex to match asset pairs
-      if (!symbolParts) return;
-
-      const base = symbolParts[1];  // The base asset (e.g., BTC)
-      const quote = symbolParts[2];  // The quote asset (e.g., USDT)
-
-      // Update or insert the market data for the symbol in the database
-      await Market.findOneAndUpdate(
-        { symbol: item.symbol },  // Find the market by symbol
-        {
-          symbol: item.symbol,  // Symbol like BTCUSDT, ETHUSDT
-          baseAsset: base,  // Base asset like BTC
-          quoteAsset: quote,  // Quote asset like USDT
-          price: parseFloat(item.lastPrice),  // Price of the asset
-          volume: parseFloat(item.volume),  // Trading volume
-          priceChangePercent: parseFloat(item.priceChangePercent),  // 24h price change percentage
-          highPrice: parseFloat(item.highPrice),  // 24h high price
-          lowPrice: parseFloat(item.lowPrice),  // 24h low price
-          openPrice: parseFloat(item.openPrice),  // Opening price
-        },
-        { upsert: true, new: true }  // Update or insert a new market record
-      );
-    });
-
-    // Wait for all update promises to finish
-    await Promise.all(updates);
-    res.json({ message: '✅ Market data updated successfully from Binance.' });
-  } catch (error) {
-    // If there is any error, send a 500 response with error message
-    console.error('❌ Error updating market data:', error);
-    res.status(500).json({ error: '❌ Failed to update market data' });
-  }
-}
-
-// This function fetches all the markets from the database and returns them
+// Get all market data stored from Bitget WebSocket
 async function getAllMarkets(req, res) {
   try {
-    // Fetch all the markets stored in the MongoDB database
     const markets = await Market.find({});
-    res.json(markets);  // Return all the markets as a response
+    res.json(markets);
   } catch (error) {
-    // If there is any error fetching the markets, send a 500 response with error message
     console.error('❌ Error fetching markets:', error);
     res.status(500).json({ error: '❌ Could not fetch markets' });
   }
 }
 
-module.exports = { updateAllMarkets, getAllMarkets };
+// Get the latest order book snapshot
+async function getOrderBook(req, res) {
+  try {
+    const book = await OrderBook.findOne().sort({ updatedAt: -1 });
+    res.json(book);
+  } catch (error) {
+    console.error('❌ Error fetching order book:', error);
+    res.status(500).json({ error: '❌ Could not fetch order book' });
+  }
+}
+
+// Get recent trades
+async function getTrades(req, res) {
+  try {
+    const trades = await Trade.find().sort({ timestamp: -1 }).limit(100);
+    res.json(trades);
+  } catch (error) {
+    console.error('❌ Error fetching trades:', error);
+    res.status(500).json({ error: '❌ Could not fetch trades' });
+  }
+}
+
+// Get recent candlesticks (klines)
+async function getKlines(req, res) {
+  try {
+    const klines = await Kline.find().sort({ openTime: -1 }).limit(100);
+    res.json(klines);
+  } catch (error) {
+    console.error('❌ Error fetching klines:', error);
+    res.status(500).json({ error: '❌ Could not fetch klines' });
+  }
+}
+
+module.exports = {
+  getAllMarkets,
+  getOrderBook,
+  getTrades,
+  getKlines
+};
