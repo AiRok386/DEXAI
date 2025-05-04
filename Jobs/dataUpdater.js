@@ -114,3 +114,7 @@ module.exports = {
   startUpdater,
   getMarketCache: () => marketCache,
 };
+const { updateMarket } = require('../cache/marketCache');
+
+// When receiving live price from Bitget WS:
+updateMarket('BTCUSDT', { price: ' , volume: '...etc' });
