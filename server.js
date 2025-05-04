@@ -84,6 +84,9 @@ async function startServer() {
     console.error('❌ Failed to start server:', err);
   }
 }
+const connectOrderBookSocket = require('./services/bitgetOrderBookService');
+connectOrderBookSocket();
 
 // Boot the backend
+
 startServer();
