@@ -1,44 +1,65 @@
-const axios = require('axios');
+const WebSocket = require('ws');
+let io; // Socket.IO instance will be assigned in init()
 
-let io; // Socket.IO will be assigned in init()
+// Bitget WebSocket URL
+const BITGET_WS_URL = 'wss://ws.bitget.com/spot/v1/stream';
 
-// Replace with the asset you want to track (e.g., bitcoin, ethereum, etc.)
-const SYMBOL = 'bitcoin';
-const API_URL = `https://api.coincap.io/v2/assets/${SYMBOL}`;
-let lastPrice = null;
+// Function to connect to Bitget WebSocket and listen to trade updates
+const connectTradeStream = () => {
+  const ws = new WebSocket(BITGET_WS_URL);
 
-const fetchPriceAndEmit = async () => {
-  try {
-    const response = await axios.get(API_URL);
-    const asset = response.data.data;
+  ws.on('open', () => {
+    console.log('✅ Connected to Bitget WebSocket for Trades');
 
-    if (!asset || !asset.priceUsd) return;
+    // Subscribe to the trade channel for BTC-USDT (can change this as needed)
+    ws.send(JSON.stringify({
+      op: 'subscribe',
+      args: [{
+        channel: 'spot/trade',
+        instId: 'BTC-USDT',
+      }],
+    }));
+  });
 
-    const price = parseFloat(asset.priceUsd).toFixed(2);
-    const timestamp = Date.now();
-    const qty = (Math.random() * 0.5 + 0.01).toFixed(5); // simulate random volume
-    const isBuyerMaker = Math.random() < 0.5;
+  ws.on('message', (data) => {
+    const parsedData = JSON.parse(data);
 
-    // Skip if price hasn't changed to prevent spam
-    if (price === lastPrice) return;
-    lastPrice = price;
+    // Check if the message is from the trade channel
+    if (parsedData.arg?.channel === 'spot/trade') {
+      const trade = parsedData.data[0]; // Get the first trade object
 
-    io.emit('tradeUpdate', {
-      price,
-      qty,
-      timestamp,
-      isBuyerMaker,
-    });
+      if (!trade) return;
 
-    console.log(`📡 Emitted trade: $${price} | Qty: ${qty}`);
-  } catch (err) {
-    console.error('❌ Failed to fetch price:', err.message);
-  }
+      const price = parseFloat(trade.price).toFixed(2);
+      const qty = parseFloat(trade.size).toFixed(5);
+      const timestamp = Date.now();
+      const isBuyerMaker = trade.side === 'buy'; // In Bitget, 'buy' side means buyer is the maker
+
+      // Emit trade data to the frontend via Socket.IO
+      io.emit('tradeUpdate', {
+        price,
+        qty,
+        timestamp,
+        isBuyerMaker,
+      });
+
+      console.log(`📡 Emitted trade: $${price} | Qty: ${qty} | Buyer Maker: ${isBuyerMaker}`);
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('❌ Disconnected from Bitget WebSocket');
+  });
+
+  ws.on('error', (err) => {
+    console.error('WebSocket Error:', err);
+  });
 };
 
+// Initialize the trade stream with Socket.IO instance
 const initTradeStream = (socketIOInstance) => {
   io = socketIOInstance;
-  setInterval(fetchPriceAndEmit, 5000); // Fetch every 5 seconds
+  connectTradeStream(); // Start the WebSocket connection and listen for trade updates
 };
 
 module.exports = initTradeStream;
