@@ -1,38 +1,88 @@
+// utils/priceUpdater.js
+
+const WebSocket = require('ws');
 const Token = require('../models/token.model');
-const fetchBinanceData = require('./fetchBinanceData');
 
-const UPDATE_INTERVAL = 5000; // 5 seconds
+const BITGET_WS_URL = 'wss://ws.bitget.com/spot/v1/stream';
+let ws;
 
-async function updateTokenPrices() {
+/**
+ * Subscribe to ticker updates for all active tokens
+ */
+async function subscribeToTickers() {
+  const tokens = await Token.find({ active: true });
+  if (!tokens.length) {
+    console.warn('⚠️ No active tokens found to subscribe');
+    return;
+  }
+
+  const args = tokens.map(token => ({
+    instId: token.symbol.toUpperCase(), // e.g., BTCUSDT
+    channel: 'ticker'
+  }));
+
+  const payload = {
+    op: 'subscribe',
+    args
+  };
+
+  ws.send(JSON.stringify(payload));
+  console.log('📡 Subscribed to ticker updates for:', args.map(a => a.instId).join(', '));
+}
+
+/**
+ * Handle incoming Bitget ticker messages and update DB
+ */
+async function handleTickerUpdate(msg) {
   try {
-    const tokens = await Token.find({ active: true });
+    const data = JSON.parse(msg);
+    if (data?.arg?.channel !== 'ticker' || !data.data) return;
 
-    for (const token of tokens) {
-      const data = await fetchBinanceData(token.symbol); // e.g. BTCUSDT, ETHUSDT
+    const ticker = data.data[0];
+    const symbol = data.arg.instId;
 
-      if (data !== null) {
-        token.currentPrice = data.price;
-        token.volume = data.volume;
-        token.priceChangePercent = data.priceChangePercent;
-        token.highPrice = data.highPrice;
-        token.lowPrice = data.lowPrice;
+    const updated = await Token.findOneAndUpdate(
+      { symbol },
+      {
+        currentPrice: parseFloat(ticker.lastPr),
+        volume: parseFloat(ticker.baseVol),
+        priceChangePercent: parseFloat(ticker.change24h),
+        highPrice: parseFloat(ticker.high24h),
+        lowPrice: parseFloat(ticker.low24h),
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
 
-        await token.save();
-
-        console.log(`✅ Updated ${token.symbol} | Price: $${data.price} | Vol: ${data.volume}`);
-      } else {
-        console.warn(`⚠️ Skipped ${token.symbol} — data unavailable`);
-      }
+    if (updated) {
+      console.log(`✅ ${symbol} updated | $${updated.currentPrice} | Vol: ${updated.volume}`);
     }
-  } catch (error) {
-    console.error('❌ Error updating token prices:', error.message);
+  } catch (err) {
+    console.error('❌ Failed to handle ticker update:', err.message);
   }
 }
 
+/**
+ * Start the Bitget WebSocket connection and handle ticker data
+ */
 function startPriceUpdater() {
-  updateTokenPrices(); // Run immediately
-  setInterval(updateTokenPrices, UPDATE_INTERVAL); // Then repeat
-  console.log('🔁 Token Price Updater started.');
+  ws = new WebSocket(BITGET_WS_URL);
+
+  ws.on('open', async () => {
+    console.log('🔌 Connected to Bitget WebSocket');
+    await subscribeToTickers();
+  });
+
+  ws.on('message', handleTickerUpdate);
+
+  ws.on('error', (err) => {
+    console.error('❌ Bitget WebSocket error:', err.message);
+  });
+
+  ws.on('close', () => {
+    console.warn('⚠️ Bitget WebSocket closed. Reconnecting in 5 seconds...');
+    setTimeout(startPriceUpdater, 5000);
+  });
 }
 
 module.exports = { startPriceUpdater };
