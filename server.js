@@ -100,6 +100,9 @@ const { connectWebSocket } = require('./services/bitgetWebSocket');
 connectWebSocket();
 
 // ... rest of your app initialization
+const { startPriceStream } = require('./controllers/priceController');
+
+startPriceStream(); // Start Bitget price tracking
 
 
 
