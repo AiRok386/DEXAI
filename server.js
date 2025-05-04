@@ -91,7 +91,16 @@ connectOrderBookSocket();
 const { startUpdater } = require('./Jobs/dataUpdater');
 
 // Start updating market data
-startUpdater();
+
+// app.js or your main entry file
+
+const { connectWebSocket } = require('./services/bitgetWebSocket');
+
+// Initialize WebSocket connection
+connectWebSocket();
+
+// ... rest of your app initialization
+
 
 
 startServer();
