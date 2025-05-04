@@ -1,57 +1,91 @@
-// controllers/marketController.js (Bitget WebSocket version)
+// controllers/marketController.js
 
 const Market = require('../models/Market');
 const OrderBook = require('../models/OrderBook');
 const Trade = require('../models/Trade');
 const Kline = require('../models/Kline');
+const marketDataStore = require('../memory/marketdatastore');
 
-// Get all market data stored from Bitget WebSocket
-async function getAllMarkets(req, res) {
+// ✅ Get all market tickers (from MongoDB)
+const getAllMarkets = async (req, res) => {
   try {
-    const markets = await Market.find({});
-    res.json(markets);
+    const markets = await Market.find({}).sort({ updatedAt: -1 });
+    res.status(200).json(markets);
   } catch (error) {
-    console.error('❌ Error fetching markets:', error);
-    res.status(500).json({ error: '❌ Could not fetch markets' });
+    console.error('❌ Error fetching market data:', error);
+    res.status(500).json({ error: 'Could not fetch market data' });
   }
-}
+};
 
-// Get the latest order book snapshot
-async function getOrderBook(req, res) {
-  try {
-    const book = await OrderBook.findOne().sort({ updatedAt: -1 });
-    res.json(book);
-  } catch (error) {
-    console.error('❌ Error fetching order book:', error);
-    res.status(500).json({ error: '❌ Could not fetch order book' });
-  }
-}
+// ✅ Get latest order book by symbol (from MongoDB)
+const getOrderBook = async (req, res) => {
+  const { symbol } = req.params;
 
-// Get recent trades
-async function getTrades(req, res) {
   try {
-    const trades = await Trade.find().sort({ timestamp: -1 }).limit(100);
-    res.json(trades);
-  } catch (error) {
-    console.error('❌ Error fetching trades:', error);
-    res.status(500).json({ error: '❌ Could not fetch trades' });
-  }
-}
+    const book = await OrderBook.findOne({ symbol: symbol.toUpperCase() }).sort({ updatedAt: -1 });
 
-// Get recent candlesticks (klines)
-async function getKlines(req, res) {
-  try {
-    const klines = await Kline.find().sort({ openTime: -1 }).limit(100);
-    res.json(klines);
+    if (!book) {
+      return res.status(404).json({ message: `No order book found for ${symbol}` });
+    }
+
+    res.status(200).json(book);
   } catch (error) {
-    console.error('❌ Error fetching klines:', error);
-    res.status(500).json({ error: '❌ Could not fetch klines' });
+    console.error(`❌ Error fetching order book for ${symbol}:`, error);
+    res.status(500).json({ error: 'Could not fetch order book' });
   }
-}
+};
+
+// ✅ Get recent trades by symbol (from MongoDB)
+const getTrades = async (req, res) => {
+  const { symbol } = req.params;
+
+  try {
+    const trades = await Trade.find({ symbol: symbol.toUpperCase() })
+      .sort({ timestamp: -1 })
+      .limit(100);
+
+    res.status(200).json(trades);
+  } catch (error) {
+    console.error(`❌ Error fetching trades for ${symbol}:`, error);
+    res.status(500).json({ error: 'Could not fetch trades' });
+  }
+};
+
+// ✅ Get recent klines by symbol and interval (from MongoDB)
+const getKlines = async (req, res) => {
+  const { symbol, interval } = req.params;
+
+  try {
+    const klines = await Kline.find({
+      symbol: symbol.toUpperCase(),
+      interval
+    })
+      .sort({ openTime: -1 })
+      .limit(100);
+
+    res.status(200).json(klines);
+  } catch (error) {
+    console.error(`❌ Error fetching klines for ${symbol}:`, error);
+    res.status(500).json({ error: 'Could not fetch klines' });
+  }
+};
+
+// ✅ Get latest live price for a symbol (from in-memory store)
+const getLivePrice = (req, res) => {
+  const { symbol } = req.params;
+  const data = marketDataStore.get(symbol.toUpperCase());
+
+  if (!data) {
+    return res.status(404).json({ message: `No recent price for ${symbol}` });
+  }
+
+  res.status(200).json(data);
+};
 
 module.exports = {
   getAllMarkets,
   getOrderBook,
   getTrades,
-  getKlines
+  getKlines,
+  getLivePrice
 };
