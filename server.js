@@ -7,8 +7,18 @@ const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
+// Utils
+const { getActiveTokens } = require('./utils/tokenList');
+const { startPriceUpdater } = require('./utils/priceUpdater');
+
 // Middlewares
 const ipBlocker = require('./middlewares/ipblocker');
+
+// Bitget WebSocket sockets
+const { connectOrderBookSocket } = require('./bitget/bitgetOrderBookSocket');
+const { connectTradeSocket } = require('./bitget/bitgetTradeSocket');
+const { connectKlineSocket } = require('./bitget/bitgetKlineSocket');
+const { connectTickerSocket } = require('./bitget/bitgetTickerSocket');
 
 // Routes
 const authRoutes = require('./routes/auth.routes');
@@ -24,20 +34,9 @@ const botRoutes = require('./routes/bot.routes');
 const marketRoutes = require('./routes/market.routes');
 const tickerRoutes = require('./routes/ticker.routes');
 
-// Bitget WebSocket connections (run once)
-const connectBitgetTradeSocket = require('./sockets/bitget.trade.socket');
-const connectBitgetOrderBookSocket = require('./sockets/bitget.orderbook.socket');
-const connectBitgetTickerSocket = require('./sockets/bitget.ticker.socket');
-const connectBitgetKlineSocket = require('./sockets/bitget.kline.socket');
-
-// Price updater
-const { startPriceUpdater } = require('./utils/priceUpdater');
-
-// Init Express app and server
+// Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
-
-// Init Socket.IO
 const io = socketIo(server, {
   cors: {
     origin: '*',
@@ -45,26 +44,22 @@ const io = socketIo(server, {
   }
 });
 
-// Environment configs
-const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crypto-exchange';
-
-// Apply middlewares
-app.set('trust proxy', 1); // For rate limiting behind proxies
-app.use(express.json());
+// Middleware setup
+app.set('trust proxy', 1);
 app.use(cors());
+app.use(express.json());
 app.use(morgan('dev'));
 app.use(ipBlocker);
 
-// Rate limiting
+// Rate Limiting
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 100,
-  message: 'Too many requests from this IP, please try again after 15 minutes.'
+  message: 'Too many requests from this IP. Try again after 15 minutes.'
 });
 app.use('/api/', apiLimiter);
 
-// API route handlers
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/wallet', walletRoutes);
@@ -80,44 +75,56 @@ app.use('/api/ticker', tickerRoutes);
 
 // Root route
 app.get('/', (req, res) => {
-  res.send('🟢 Backend with Bitget Market Mirror is running');
+  res.send('🟢 Crypto Exchange Backend with Bitget WebSockets is Live');
 });
 
-// MongoDB connection
+// MongoDB Connection
+const PORT = process.env.PORT || 5000;
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crypto-exchange';
+
 mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-.then(() => {
-  console.log('✅ MongoDB connected successfully.');
+.then(async () => {
+  console.log('✅ MongoDB connected.');
 
-  // Start Bitget WebSocket data feeds
+  // Fetch active tokens before initializing sockets
+  const tokens = await getActiveTokens();
+  if (!tokens || tokens.length === 0) {
+    console.warn('⚠️ No active tokens found. Skipping Bitget WebSocket initialization.');
+    return;
+  }
+
+  console.log('🔔 Subscribing to Bitget WebSockets for:', tokens);
+
+  // Start price updater & WebSocket streams
   startPriceUpdater();
-  connectBitgetTradeSocket();
-  connectBitgetOrderBookSocket();
-  connectBitgetKlineSocket();
-  connectBitgetTickerSocket();
+  connectOrderBookSocket(tokens);
+  connectTradeSocket(tokens);
+  connectKlineSocket(tokens);
+  connectTickerSocket(tokens);
 
-  // Start Socket.IO server for frontend clients
+  // Initialize WebSocket server
   initializeSocketServer(io);
 })
-.catch((error) => {
-  console.error('❌ Failed to connect to MongoDB:', error.message);
+.catch((err) => {
+  console.error('❌ MongoDB connection error:', err.message);
   process.exit(1);
 });
 
-// Function to initialize client socket events
+// Socket.IO logic
 function initializeSocketServer(io) {
   io.on('connection', (socket) => {
-    console.log('📡 Client connected via WebSocket');
+    console.log('📡 WebSocket client connected');
 
     socket.on('disconnect', () => {
-      console.log('❌ Client disconnected');
+      console.log('❌ WebSocket client disconnected');
     });
   });
 }
 
-// Start server
+// Start HTTP server
 server.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
