@@ -107,3 +107,6 @@ const { startPriceUpdater } = require('./utils/priceUpdater');
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+const connectBitgetKlineSocket = require('./sockets/bitget.kline.socket');
+
+
