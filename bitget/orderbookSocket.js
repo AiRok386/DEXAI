@@ -8,6 +8,7 @@ const symbols = ['btcusdt', 'ethusdt', 'solusdt']; // Add more tokens here if ne
 
 let socket;
 
+// Helper function to create the subscription payload
 function createSubscriptionPayload(tokens, channel = 'depth5') {
   return {
     op: 'subscribe',
@@ -19,9 +20,12 @@ function createSubscriptionPayload(tokens, channel = 'depth5') {
   };
 }
 
+// Function to handle incoming WebSocket messages
 function handleOrderBookMessage(message) {
   try {
     const data = JSON.parse(message);
+
+    // Ensure the data structure is valid and contains the necessary fields
     if (data.arg?.channel === 'depth5' && data.data?.length) {
       const { arg, data: [snapshot] } = data;
       const symbol = arg.instId.toUpperCase();
@@ -32,6 +36,7 @@ function handleOrderBookMessage(message) {
         asks: snapshot.asks,
       };
 
+      // Save the order book snapshot to MongoDB
       const newSnapshot = new OrderBookSnapshot(orderBook);
       newSnapshot.save()
         .then(() => console.log(`📥 OrderBook snapshot saved for ${symbol}`))
@@ -44,6 +49,7 @@ function handleOrderBookMessage(message) {
   }
 }
 
+// Function to connect to the Bitget OrderBook WebSocket
 function connectOrderBookSocket(tokens) {
   if (!tokens || tokens.length === 0) {
     console.warn('⚠️ No tokens provided for OrderBook WebSocket');
@@ -54,6 +60,8 @@ function connectOrderBookSocket(tokens) {
 
   socket.on('open', () => {
     console.log('🔌 Connected to Bitget OrderBook WebSocket');
+
+    // Create the payload for subscribing to the order book depth
     const payload = createSubscriptionPayload(tokens, 'depth5');
     socket.send(JSON.stringify(payload));
   });
@@ -62,11 +70,12 @@ function connectOrderBookSocket(tokens) {
 
   socket.on('error', (err) => {
     console.error('❌ Error with OrderBook WebSocket:', err.message);
-    socket.close();
+    socket.close(); // Close socket on error
   });
 
   socket.on('close', () => {
     console.warn('❌ OrderBook WebSocket connection closed. Reconnecting in 5 seconds...');
+    // Attempt to reconnect after 5 seconds
     setTimeout(() => connectOrderBookSocket(tokens), 5000);
   });
 }
