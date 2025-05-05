@@ -14,7 +14,7 @@ const { startPriceUpdater } = require('./utils/priceUpdater');
 // Middlewares
 const ipBlocker = require('./middlewares/ipblocker');
 
-// Bitget WebSocket sockets
+// Bitget WebSocket Sockets
 const { connectOrderBookSocket } = require('./bitget/bitgetOrderBookSocket');
 const { connectTradeSocket } = require('./bitget/bitgetTradeSocket');
 const { connectKlineSocket } = require('./bitget/bitgetKlineSocket');
@@ -40,8 +40,8 @@ const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST'],
+  },
 });
 
 // Middleware setup
@@ -53,9 +53,9 @@ app.use(ipBlocker);
 
 // Rate Limiting
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests from this IP. Try again after 15 minutes.'
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP. Try again after 15 minutes.',
 });
 app.use('/api/', apiLimiter);
 
@@ -84,34 +84,38 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crypto-exc
 
 mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
 })
-.then(async () => {
-  console.log('✅ MongoDB connected.');
+  .then(async () => {
+    console.log('✅ MongoDB connected.');
 
-  // Fetch active tokens before initializing sockets
-  const tokens = await getActiveTokens();
-  if (!tokens || tokens.length === 0) {
-    console.warn('⚠️ No active tokens found. Skipping Bitget WebSocket initialization.');
-    return;
-  }
+    // Fetch active tokens before initializing WebSockets
+    try {
+      const tokens = await getActiveTokens();
+      if (!tokens || tokens.length === 0) {
+        console.warn('⚠️ No active tokens found. Skipping Bitget WebSocket initialization.');
+        return;
+      }
 
-  console.log('🔔 Subscribing to Bitget WebSockets for:', tokens);
+      console.log('🔔 Subscribing to Bitget WebSockets for:', tokens);
 
-  // Start price updater & WebSocket streams
-  startPriceUpdater();
-  connectOrderBookSocket(tokens);
-  connectTradeSocket(tokens);
-  connectKlineSocket(tokens);
-  connectTickerSocket(tokens);
+      // Start price updater & WebSocket streams
+      startPriceUpdater();
+      connectOrderBookSocket(tokens);
+      connectTradeSocket(tokens);
+      connectKlineSocket(tokens);
+      connectTickerSocket(tokens);
 
-  // Initialize WebSocket server
-  initializeSocketServer(io);
-})
-.catch((err) => {
-  console.error('❌ MongoDB connection error:', err.message);
-  process.exit(1);
-});
+      // Initialize WebSocket server
+      initializeSocketServer(io);
+    } catch (err) {
+      console.error('❌ Error fetching active tokens or initializing WebSocket connections:', err.message);
+    }
+  })
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err.message);
+    process.exit(1);
+  });
 
 // Socket.IO logic
 function initializeSocketServer(io) {
@@ -120,6 +124,11 @@ function initializeSocketServer(io) {
 
     socket.on('disconnect', () => {
       console.log('❌ WebSocket client disconnected');
+    });
+
+    // Example of custom event handling
+    socket.on('customEvent', (data) => {
+      console.log('Received custom event:', data);
     });
   });
 }
