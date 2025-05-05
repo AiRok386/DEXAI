@@ -25,7 +25,7 @@ const tickerRoutes = require('./routes/ticker.routes');
 // WebSocket services (Bitget)
 const connectBitgetTradeSocket = require('./services/bitgetTradeSocket');
 const connectBitgetKlineSocket = require('./services/bitgetKlineSocket');  // Import Kline service
-const connectBitgetOrderBookSocket = require('./services/bitgetOrderbookSocket');
+const connectBitgetOrderBookSocket = require('./sockets/bitget.orderbook.socket');
 const connectBitgetTickerSocket = require('./services/bitgetTickerSocket');
 
 // Initialize Express
