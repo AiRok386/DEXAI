@@ -23,10 +23,10 @@ const marketRoutes = require('./routes/market.routes');
 const tickerRoutes = require('./routes/ticker.routes');
 
 // WebSocket services (Bitget)
-const connectBitgetTradeSocket = require('./services/bitgetTradeSocket');
-const connectBitgetKlineSocket = require('./services/bitgetKlineSocket');  // Import Kline service
-const connectBitgetOrderBookSocket = require('./services/bitgetOrderBookSocket');
-const connectBitgetTickerSocket = require('./services/bitgetTickerSocket');
+const connectBitgetTradeSocket = require('./services/bitget.trade.socket');
+const connectBitgetKlineSocket = require('./services/bitget.kline.socket');  // Import Kline service
+const connectBitgetOrderBookSocket = require('./services/bitget.orderbook.Socket');
+const connectBitgetTickerSocket = require('./services/bitget.ticker.socket');
 
 // Initialize Express
 const app = express();
