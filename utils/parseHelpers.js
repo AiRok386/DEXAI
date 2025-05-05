@@ -2,73 +2,71 @@
 
 /**
  * Parse and format the incoming trade data from Bitget WebSocket.
- * @param {Object} tradeData - The raw trade data from Bitget WebSocket.
- * @returns {Object} - The formatted trade data to store in the database.
+ * @param {Array} data - The trade data array from Bitget WebSocket.
+ * @returns {Object} - The formatted trade data.
  */
-function parseTradeData(tradeData) {
+function parseTradeData(data) {
+  const trade = data[0]; // Bitget sends an array of trades
   return {
-    symbol: tradeData.symbol?.toUpperCase(),
-    price: parseFloat(tradeData.price),
-    quantity: parseFloat(tradeData.size),
-    time: new Date(tradeData.timestamp),
-    isBuy: tradeData.side === 'buy',
+    symbol: trade.instId,
+    price: parseFloat(trade.px),
+    quantity: parseFloat(trade.sz),
+    time: new Date(Number(trade.ts)),
+    isBuy: trade.side === 'buy',
   };
 }
 
 /**
  * Parse and format the incoming order book data from Bitget WebSocket.
- * @param {Object} orderBookData - The raw order book data from Bitget WebSocket.
- * @returns {Object} - The formatted order book data to store in the database.
+ * @param {Object} data - The order book snapshot from Bitget.
+ * @returns {Object} - Formatted order book object.
  */
-function parseOrderBookData(orderBookData) {
+function parseOrderBookData(data) {
   return {
-    symbol: orderBookData.symbol?.toUpperCase(),
-    bids: orderBookData.bids.map(([price, quantity]) => ({
+    symbol: data.instId,
+    bids: data.bids.slice(0, 10).map(([price, quantity]) => ({
       price: parseFloat(price),
       quantity: parseFloat(quantity),
     })),
-    asks: orderBookData.asks.map(([price, quantity]) => ({
+    asks: data.asks.slice(0, 10).map(([price, quantity]) => ({
       price: parseFloat(price),
       quantity: parseFloat(quantity),
     })),
-    time: new Date(orderBookData.timestamp),
+    time: new Date(Number(data.ts)),
   };
 }
 
 /**
- * Converts interval string to milliseconds.
- * Supports 'm', 'h', 'd' formats like '1m', '5m', '1h', '1d'
- */
-function getIntervalMs(interval) {
-  const num = parseInt(interval);
-  if (interval.endsWith('m')) return num * 60 * 1000;
-  if (interval.endsWith('h')) return num * 60 * 60 * 1000;
-  if (interval.endsWith('d')) return num * 24 * 60 * 60 * 1000;
-  return 60 * 1000; // Default to 1m
-}
-
-/**
  * Parse and format the incoming kline (candlestick) message from Bitget WebSocket.
- * @param {Object} parsed - Parsed kline message with arg and data fields.
- * @returns {Object} - The formatted kline document to store in the database.
+ * @param {Object} parsed - Parsed kline message from Bitget.
+ * @returns {Object} - The formatted kline object.
  */
 function parseKlineMessage(parsed) {
   const { arg, data } = parsed;
-  const [timestamp, open, high, low, close, volume, quoteVolume] = data;
-  const interval = arg.instId.split('.')[0].split('candle')[1];
-  const symbol = arg.instId.split('.')[1];
+  const [
+    openTime,
+    open,
+    high,
+    low,
+    close,
+    volume,
+    quoteVolume
+  ] = data[0];
+
+  const symbol = arg.instId;
+  const interval = arg.channel.replace('candle', '');
 
   return {
-    symbol: symbol.toUpperCase(),
-    interval,
-    open: open,
-    high: high,
-    low: low,
-    close: close,
-    volume: volume,
-    openTime: new Date(Number(timestamp)),
-    closeTime: new Date(Number(timestamp) + getIntervalMs(interval)),
-    tradeCount: 0, // Not provided by Bitget
+    symbol: symbol,
+    interval: interval,
+    open: parseFloat(open),
+    high: parseFloat(high),
+    low: parseFloat(low),
+    close: parseFloat(close),
+    volume: parseFloat(volume),
+    openTime: new Date(Number(openTime)),
+    closeTime: new Date(Number(openTime) + getIntervalMs(interval)),
+    tradeCount: 0,
     isFinal: true,
     symbolInterval: `${symbol}_${interval}`,
     source: 'Bitget',
@@ -76,20 +74,32 @@ function parseKlineMessage(parsed) {
 }
 
 /**
- * Parse and format the incoming 24h market ticker data from Bitget WebSocket.
- * @param {Object} marketData - Raw 24h ticker data.
- * @returns {Object} - Formatted 24h data object.
+ * Parse and format the incoming market ticker (24h stats) data from Bitget WebSocket.
+ * @param {Object} data - Ticker data object from Bitget.
+ * @returns {Object} - Formatted market data.
  */
-function parseMarketData(marketData) {
+function parseMarketData(data) {
   return {
-    symbol: marketData.symbol?.toUpperCase(),
-    priceChange: parseFloat(marketData.priceChange),
-    priceChangePercent: parseFloat(marketData.priceChangePercent),
-    highPrice: parseFloat(marketData.highPrice),
-    lowPrice: parseFloat(marketData.lowPrice),
-    volume: parseFloat(marketData.volume),
-    openPrice: parseFloat(marketData.openPrice),
+    symbol: data.instId,
+    lastPrice: parseFloat(data.lastPr),
+    high24h: parseFloat(data.high24h),
+    low24h: parseFloat(data.low24h),
+    change24h: parseFloat(data.change24h),
+    volume24h: parseFloat(data.baseVol),
+    priceChangePercent: parseFloat(data.changePct24h),
+    timestamp: new Date(Number(data.ts)),
   };
+}
+
+/**
+ * Converts interval string like '1m', '5m', '1h', '1d' to milliseconds.
+ */
+function getIntervalMs(interval) {
+  const num = parseInt(interval);
+  if (interval.endsWith('m')) return num * 60 * 1000;
+  if (interval.endsWith('h')) return num * 60 * 60 * 1000;
+  if (interval.endsWith('d')) return num * 24 * 60 * 60 * 1000;
+  return 60 * 1000; // fallback 1 minute
 }
 
 module.exports = {
