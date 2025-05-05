@@ -25,8 +25,13 @@ const tickerRoutes = require('./routes/ticker.routes');
 // WebSocket services (Bitget)
 const connectBitgetTradeSocket = require('./services/bitgetTradeSocket');
 const connectBitgetKlineSocket = require('./services/bitgetKlineSocket');  // Import Kline service
-const connectBitgetOrderBookSocket = require('./sockets/bitget.orderbook.socket');
+const connectBitgetOrderBookSocket = require('./services/bitgetOrderbookSocket');
 const connectBitgetTickerSocket = require('./services/bitgetTickerSocket');
+
+const connectBitgetTradeSocket = require('./sockets/bitget.trade.socket');
+const connectBitgetOrderBookSocket = require('./sockets/bitget.orderbook.socket');
+const connectBitgetTickerSocket = require('./sockets/bitget.ticker.socket');
+const connectBitgetKlineSocket = require('./sockets/bitget.kline.socket'); // ✅ Only once
 
 // Initialize Express
 const app = express();
@@ -107,6 +112,6 @@ const { startPriceUpdater } = require('./utils/priceUpdater');
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
-const connectBitgetKlineSocket = require('./sockets/bitget.kline.socket');
+
 
 
