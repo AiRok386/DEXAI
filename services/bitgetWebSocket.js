@@ -59,6 +59,11 @@ function connectWebSocket() {
 
   // Handle incoming WebSocket messages
   ws.on('message', (data) => {
+    // Ignore pong messages from the server to prevent parsing errors
+    if (data === 'pong') {
+      return;
+    }
+
     try {
       const message = JSON.parse(data);
 
