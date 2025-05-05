@@ -3,7 +3,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const http = require('http');
 const socketIo = require('socket.io');
-const WebSocket = require('ws');
 const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
@@ -25,7 +24,7 @@ const tickerRoutes = require('./routes/ticker.routes');
 
 // WebSocket services (Bitget)
 const connectBitgetTradeSocket = require('./services/bitgetTradeSocket');
-const connectBitgetKlineSocket = require('./services/bitgetKlineSocket');
+const connectBitgetKlineSocket = require('./services/bitgetKlineSocket');  // Import Kline service
 const connectBitgetOrderBookSocket = require('./services/bitgetOrderBookSocket');
 const connectBitgetTickerSocket = require('./services/bitgetTickerSocket');
 
@@ -80,10 +79,10 @@ mongoose.connect(MONGO_URI, {
   .then(() => {
     console.log('✅ MongoDB connected successfully.');
     startPriceUpdater();
-    connectBitgetTradeSocket(io);
-    connectBitgetKlineSocket(io);
-    connectBitgetOrderBookSocket(io);
-    connectBitgetTickerSocket(io);
+    connectBitgetTradeSocket();  // Initiate trade socket connection
+    connectBitgetKlineSocket();  // Initiate kline socket connection (no need for `io`)
+    connectBitgetOrderBookSocket();  // Initiate order book socket connection
+    connectBitgetTickerSocket();  // Initiate ticker socket connection
     createSocketServer(io);
   })
   .catch((err) => {
@@ -103,3 +102,8 @@ function createSocketServer(io) {
 
 // Price updater (if required to send price updates to clients)
 const { startPriceUpdater } = require('./utils/priceUpdater');
+
+// Start the server
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
