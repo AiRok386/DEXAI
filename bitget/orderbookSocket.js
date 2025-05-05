@@ -25,7 +25,6 @@ function handleOrderBookMessage(message) {
   try {
     const data = JSON.parse(message);
 
-    // Ensure the data structure is valid and contains the necessary fields
     if (data.arg?.channel === 'depth5' && data.data?.length) {
       const { arg, data: [snapshot] } = data;
       const symbol = arg.instId.toUpperCase();
@@ -43,14 +42,29 @@ function handleOrderBookMessage(message) {
         .catch(err => console.error(`❌ Error saving snapshot for ${symbol}:`, err.message));
     } else if (data.event === 'subscribe') {
       console.log(`✅ Subscribed to ${data.arg.channel} for ${data.arg.instId}`);
+    } else {
+      console.warn('⚠️ Unexpected message format:', data);
     }
   } catch (err) {
     console.error('❌ Error parsing WebSocket message:', err.message);
   }
 }
 
+// Function to handle WebSocket connection errors
+function handleWebSocketError(err) {
+  console.error('❌ WebSocket Error:', err.message);
+  socket.close(); // Close socket on error to trigger reconnection
+}
+
+// Function to handle WebSocket closure
+function handleWebSocketClose() {
+  console.warn('❌ OrderBook WebSocket connection closed. Reconnecting in 5 seconds...');
+  // Attempt to reconnect after 5 seconds
+  setTimeout(() => connectOrderBookSocket(symbols), 5000);
+}
+
 // Function to connect to the Bitget OrderBook WebSocket
-function connectOrderBookSocket(tokens) {
+function connectOrderBookSocket(tokens = symbols) {
   if (!tokens || tokens.length === 0) {
     console.warn('⚠️ No tokens provided for OrderBook WebSocket');
     return;
@@ -60,7 +74,6 @@ function connectOrderBookSocket(tokens) {
 
   socket.on('open', () => {
     console.log('🔌 Connected to Bitget OrderBook WebSocket');
-
     // Create the payload for subscribing to the order book depth
     const payload = createSubscriptionPayload(tokens, 'depth5');
     socket.send(JSON.stringify(payload));
@@ -68,16 +81,9 @@ function connectOrderBookSocket(tokens) {
 
   socket.on('message', handleOrderBookMessage);
 
-  socket.on('error', (err) => {
-    console.error('❌ Error with OrderBook WebSocket:', err.message);
-    socket.close(); // Close socket on error
-  });
+  socket.on('error', handleWebSocketError);
 
-  socket.on('close', () => {
-    console.warn('❌ OrderBook WebSocket connection closed. Reconnecting in 5 seconds...');
-    // Attempt to reconnect after 5 seconds
-    setTimeout(() => connectOrderBookSocket(tokens), 5000);
-  });
+  socket.on('close', handleWebSocketClose);
 }
 
 module.exports = { connectOrderBookSocket };
