@@ -8,7 +8,7 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const ipBlocker = require('./middlewares/ipblocker');
 
-// Import routes
+// Route imports
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const walletRoutes = require('./routes/wallet.routes');
@@ -22,18 +22,16 @@ const botRoutes = require('./routes/bot.routes');
 const marketRoutes = require('./routes/market.routes');
 const tickerRoutes = require('./routes/ticker.routes');
 
-// WebSocket services (Bitget)
-const connectBitgetTradeSocket = require('./services/bitgetTradeSocket');
-const connectBitgetKlineSocket = require('./services/bitgetKlineSocket');  // Import Kline service
-const connectBitgetOrderBookSocket = require('./services/bitgetOrderbookSocket');
-const connectBitgetTickerSocket = require('./services/bitgetTickerSocket');
-
+// WebSocket service connections (only once)
 const connectBitgetTradeSocket = require('./sockets/bitget.trade.socket');
 const connectBitgetOrderBookSocket = require('./sockets/bitget.orderbook.socket');
 const connectBitgetTickerSocket = require('./sockets/bitget.ticker.socket');
-const connectBitgetKlineSocket = require('./sockets/bitget.kline.socket'); // ✅ Only once
+const connectBitgetKlineSocket = require('./sockets/bitget.kline.socket');
 
-// Initialize Express
+// Price updater (optional utility)
+const { startPriceUpdater } = require('./utils/priceUpdater');
+
+// Initialize Express and server
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -43,21 +41,22 @@ const io = socketIo(server, {
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crypto-exchange';
 
-// Middleware setup
+// Middleware
 app.set('trust proxy', 1);
 app.use(express.json());
 app.use(cors());
 app.use(morgan('combined'));
 app.use(ipBlocker);
 
+// Rate limiting
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
   message: 'Too many requests, please try again later.'
 });
 app.use('/api/', apiLimiter);
 
-// Routes
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/wallet', walletRoutes);
@@ -76,42 +75,40 @@ app.get('/', (req, res) => {
   res.send('🟢 Backend with Bitget Market Mirror is running');
 });
 
-// Connect to DB and start all services
+// MongoDB connection and WebSocket setup
 mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-  .then(() => {
-    console.log('✅ MongoDB connected successfully.');
-    startPriceUpdater();
-    connectBitgetTradeSocket();  // Initiate trade socket connection
-    connectBitgetKlineSocket();  // Initiate kline socket connection (no need for `io`)
-    connectBitgetOrderBookSocket();  // Initiate order book socket connection
-    connectBitgetTickerSocket();  // Initiate ticker socket connection
-    createSocketServer(io);
-  })
-  .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
-    process.exit(1);
-  });
+.then(() => {
+  console.log('✅ MongoDB connected successfully.');
 
-// WebSocket listener
+  // Start WebSocket data streams
+  startPriceUpdater();
+  connectBitgetTradeSocket();
+  connectBitgetKlineSocket();
+  connectBitgetOrderBookSocket();
+  connectBitgetTickerSocket();
+
+  // Setup client socket connections
+  createSocketServer(io);
+})
+.catch((err) => {
+  console.error('❌ MongoDB connection error:', err);
+  process.exit(1);
+});
+
+// Socket.io listener
 function createSocketServer(io) {
   io.on('connection', (socket) => {
-    console.log('Client connected');
+    console.log('📡 Client connected');
     socket.on('disconnect', () => {
-      console.log('Client disconnected');
+      console.log('❌ Client disconnected');
     });
   });
 }
 
-// Price updater (if required to send price updates to clients)
-const { startPriceUpdater } = require('./utils/priceUpdater');
-
-// Start the server
+// Start server
 server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`🚀 Server is running on port ${PORT}`);
 });
-
-
-
