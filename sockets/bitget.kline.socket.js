@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const Kline = require('../models/Kline');
 
+// List of allowed trading pairs
 const allowedSymbols = [
   'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
   'DOGEUSDT', 'PEPEUSDT', 'SUIUSDT', 'ADAUSDT', 'TRXUSDT',
@@ -56,7 +57,7 @@ const connectBitgetKlineSocket = () => {
 
   ws.on('close', () => {
     console.warn('⚠️ Bitget Kline WebSocket closed. Reconnecting in 5s...');
-    setTimeout(connectBitgetKlineSocket, 5000);
+    setTimeout(connectBitgetKlineSocket, 5000);  // Attempt to reconnect after 5 seconds
   });
 
   ws.on('error', (err) => {
