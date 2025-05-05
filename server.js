@@ -16,12 +16,12 @@ const walletRoutes = require('./routes/wallet.routes');
 const tradingRoutes = require('./routes/trade.routes');
 const tokenRoutes = require('./routes/token.routes');
 const icoRoutes = require('./routes/ico.routes');
-const tradeRoutes = require('./routes/trade.routes');
 const orderbookRoutes = require('./routes/orderbook.routes');
 const candlesRoutes = require('./routes/candles.routes');
 const adminBotRoutes = require('./routes/admin/bots');
 const botRoutes = require('./routes/bot.routes');
 const marketRoutes = require('./routes/market.routes');
+const tickerRoutes = require('./routes/ticker.routes');
 
 // WebSocket services (Bitget)
 const connectBitgetTradeSocket = require('./services/bitgetTradeSocket');
@@ -60,14 +60,14 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/trading', tradingRoutes);
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/ico', icoRoutes);
-app.use('/api/trades', tradeRoutes);
 app.use('/api/orderbook', orderbookRoutes);
 app.use('/api/candles', candlesRoutes);
 app.use('/admin/bots', adminBotRoutes);
 app.use('/api/bots', botRoutes);
 app.use('/api/market', marketRoutes);
+app.use('/api/ticker', tickerRoutes);
 
-// Root check
+// Root route
 app.get('/', (req, res) => {
   res.send('🟢 Backend with Bitget Market Mirror is running');
 });
@@ -101,5 +101,5 @@ function createSocketServer(io) {
   });
 }
 
-// Price updater
+// Price updater (if required to send price updates to clients)
 const { startPriceUpdater } = require('./utils/priceUpdater');
