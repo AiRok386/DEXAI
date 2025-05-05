@@ -1,41 +1,40 @@
 const WebSocket = require('ws');
 const Ticker = require('../models/Ticker');
-// const Trade = require('../models/Trade'); // Uncomment if saving trade data
-const { parseTradeData, parseTickerData } = require('../utils/parseHelpers'); // optional utils
+// const Trade = require('../models/Trade'); // Uncomment if needed
+// const { parseTickerData, parseTradeData } = require('../utils/parseHelpers'); // Optional
 
-const socketURL = 'wss://ws.bitget.com/spot/v1/stream';
+const WS_URL = 'wss://ws.bitget.com/spot/v1/stream';
 let socket;
 
-const symbols = ['btcusdt', 'ethusdt']; // Add more symbols here
+function createSubscriptionPayload(tokens, channels = ['ticker', 'trade']) {
+  const args = [];
 
-function createSubscriptionArgs(tokens, channel) {
-  return tokens.map(symbol => ({
-    instType: 'SPOT',
-    channel,
-    instId: symbol.toUpperCase(),
-  }));
-}
-
-function subscribeToChannels(tokens) {
-  const channels = ['ticker', 'trade'];
   channels.forEach(channel => {
-    const args = createSubscriptionArgs(tokens, channel);
-    socket.send(JSON.stringify({ op: 'subscribe', args }));
+    tokens.forEach(symbol => {
+      args.push({
+        instType: 'SPOT',
+        channel,
+        instId: symbol.toUpperCase(),
+      });
+    });
   });
+
+  return { op: 'subscribe', args };
 }
 
-function handleMessage(raw) {
+function handleWebSocketMessage(message) {
   try {
-    const message = JSON.parse(raw);
+    const data = JSON.parse(message);
+    const { arg, data: payload } = data;
 
-    const { arg, data } = message;
-    if (!arg || !data || !data.length) return;
+    if (!arg || !payload?.length) return;
 
     const symbol = arg.instId.toUpperCase();
     const channel = arg.channel;
 
     if (channel === 'ticker') {
-      const tick = data[0];
+      const tick = payload[0];
+
       const newTicker = {
         symbol,
         lastPrice: tick.last,
@@ -49,42 +48,43 @@ function handleMessage(raw) {
 
       Ticker.findOneAndUpdate({ symbol }, newTicker, { upsert: true, new: true })
         .then(() => console.log(`💹 Ticker updated for ${symbol}`))
-        .catch(err => console.error(`❌ Error saving ticker for ${symbol}:`, err.message));
+        .catch(err => console.error(`❌ Failed to save ticker for ${symbol}:`, err.message));
     }
 
     if (channel === 'trade') {
-      console.log(`💱 Trade update for ${symbol}:`, JSON.stringify(data[0]));
-      // Optional: save to Trade model here
+      console.log(`💱 Trade update for ${symbol}:`, JSON.stringify(payload[0]));
+      // Save to Trade model if needed
     }
 
   } catch (err) {
-    console.error('❌ WebSocket message parse error:', err.message);
+    console.error('❌ Failed to parse WebSocket message:', err.message);
   }
 }
 
-function connectBitgetSocket(tokens) {
+function connectBitgetTickerSocket(tokens) {
   if (!tokens || tokens.length === 0) {
-    console.warn('⚠️ No tokens provided to WebSocket');
+    console.warn('⚠️ No tokens provided to Ticker WebSocket');
     return;
   }
 
-  socket = new WebSocket(socketURL);
+  socket = new WebSocket(WS_URL);
 
   socket.on('open', () => {
-    console.log('🔌 Connected to Bitget WebSocket');
-    subscribeToChannels(tokens);
+    console.log('🔌 Connected to Bitget Ticker WebSocket');
+    const subscriptionPayload = createSubscriptionPayload(tokens, ['ticker', 'trade']);
+    socket.send(JSON.stringify(subscriptionPayload));
   });
 
-  socket.on('message', handleMessage);
+  socket.on('message', handleWebSocketMessage);
 
   socket.on('error', (err) => {
-    console.error('❌ WebSocket error:', err.message);
+    console.error('❌ Ticker WebSocket error:', err.message);
   });
 
   socket.on('close', () => {
-    console.warn('❌ WebSocket closed. Reconnecting in 5s...');
-    setTimeout(() => connectBitgetSocket(tokens), 5000);
+    console.warn('❌ Ticker WebSocket closed. Reconnecting in 5s...');
+    setTimeout(() => connectBitgetTickerSocket(tokens), 5000);
   });
 }
 
-module.exports = { connectBitgetSocket };
+module.exports = { connectBitgetTickerSocket };
