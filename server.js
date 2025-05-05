@@ -6,9 +6,11 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+
+// Middlewares
 const ipBlocker = require('./middlewares/ipblocker');
 
-// Route imports
+// Routes
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const walletRoutes = require('./routes/wallet.routes');
@@ -22,41 +24,47 @@ const botRoutes = require('./routes/bot.routes');
 const marketRoutes = require('./routes/market.routes');
 const tickerRoutes = require('./routes/ticker.routes');
 
-// WebSocket service connections (only once)
+// Bitget WebSocket connections (run once)
 const connectBitgetTradeSocket = require('./sockets/bitget.trade.socket');
 const connectBitgetOrderBookSocket = require('./sockets/bitget.orderbook.socket');
 const connectBitgetTickerSocket = require('./sockets/bitget.ticker.socket');
 const connectBitgetKlineSocket = require('./sockets/bitget.kline.socket');
 
-// Price updater (optional utility)
+// Price updater
 const { startPriceUpdater } = require('./utils/priceUpdater');
 
-// Initialize Express and server
+// Init Express app and server
 const app = express();
 const server = http.createServer(app);
+
+// Init Socket.IO
 const io = socketIo(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] }
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
 });
 
+// Environment configs
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crypto-exchange';
 
-// Middleware
-app.set('trust proxy', 1);
+// Apply middlewares
+app.set('trust proxy', 1); // For rate limiting behind proxies
 app.use(express.json());
 app.use(cors());
-app.use(morgan('combined'));
+app.use(morgan('dev'));
 app.use(ipBlocker);
 
 // Rate limiting
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
-  message: 'Too many requests, please try again later.'
+  message: 'Too many requests from this IP, please try again after 15 minutes.'
 });
 app.use('/api/', apiLimiter);
 
-// API routes
+// API route handlers
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/wallet', walletRoutes);
@@ -75,7 +83,7 @@ app.get('/', (req, res) => {
   res.send('🟢 Backend with Bitget Market Mirror is running');
 });
 
-// MongoDB connection and WebSocket setup
+// MongoDB connection
 mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -83,25 +91,26 @@ mongoose.connect(MONGO_URI, {
 .then(() => {
   console.log('✅ MongoDB connected successfully.');
 
-  // Start WebSocket data streams
+  // Start Bitget WebSocket data feeds
   startPriceUpdater();
   connectBitgetTradeSocket();
-  connectBitgetKlineSocket();
   connectBitgetOrderBookSocket();
+  connectBitgetKlineSocket();
   connectBitgetTickerSocket();
 
-  // Setup client socket connections
-  createSocketServer(io);
+  // Start Socket.IO server for frontend clients
+  initializeSocketServer(io);
 })
-.catch((err) => {
-  console.error('❌ MongoDB connection error:', err);
+.catch((error) => {
+  console.error('❌ Failed to connect to MongoDB:', error.message);
   process.exit(1);
 });
 
-// Socket.io listener
-function createSocketServer(io) {
+// Function to initialize client socket events
+function initializeSocketServer(io) {
   io.on('connection', (socket) => {
-    console.log('📡 Client connected');
+    console.log('📡 Client connected via WebSocket');
+
     socket.on('disconnect', () => {
       console.log('❌ Client disconnected');
     });
@@ -110,5 +119,5 @@ function createSocketServer(io) {
 
 // Start server
 server.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`🚀 Server is running on http://localhost:${PORT}`);
 });
