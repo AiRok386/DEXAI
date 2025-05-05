@@ -1,67 +1,71 @@
+// bitget/tickerSocket.js
+
 const WebSocket = require('ws');
-const Ticker = require('../models/Ticker'); // MongoDB model to store ticker info
+const Ticker = require('../models/Ticker');
 
-const symbols = ['btcusdt', 'ethusdt']; // Add more symbols as needed
+// List of top trading symbols (modify as needed)
+const allowedSymbols = [
+  'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
+  'DOGEUSDT', 'PEPEUSDT', 'SUIUSDT', 'ADAUSDT', 'TRXUSDT',
+  'TONUSDT', 'LTCUSDT', 'AVAXUSDT', 'SHIBUSDT', 'DOTUSDT'
+];
 
-function subscribeTicker(ws, symbol) {
-  const payload = {
-    op: 'subscribe',
-    args: [
-      {
-        instType: 'SPOT',
-        channel: 'ticker',
-        instId: symbol.toUpperCase(),
-      },
-    ],
-  };
-  ws.send(JSON.stringify(payload));
-}
-
-function handleTickerMessage(data) {
-  const { arg, data: [tick] } = data;
-  const symbol = arg.instId.toUpperCase();
-
-  const newTicker = {
-    symbol,
-    lastPrice: tick.last,
-    open24h: tick.open24h,
-    high24h: tick.high24h,
-    low24h: tick.low24h,
-    priceChangePercent: tick.changeUtc24h,
-    baseVolume: tick.baseVolume,
-    quoteVolume: tick.quoteVolume,
-  };
-
-  Ticker.findOneAndUpdate({ symbol }, newTicker, { upsert: true, new: true })
-    .then(() => console.log(`💹 Ticker updated for ${symbol}`))
-    .catch(err => console.error(`❌ Error saving ticker for ${symbol}:`, err.message));
-}
-
+// Function to connect and manage Bitget Ticker WebSocket
 function connectBitgetTickerSocket() {
   const ws = new WebSocket('wss://ws.bitget.com/spot/v1/stream');
 
   ws.on('open', () => {
-    console.log('🔌 Connected to Bitget Ticker WebSocket');
-    symbols.forEach(symbol => subscribeTicker(ws, symbol));
+    console.log('✅ Connected to Bitget Ticker WebSocket');
+
+    const subscribePayload = {
+      op: 'subscribe',
+      args: allowedSymbols.map(symbol => ({
+        instType: 'SPOT',
+        channel: 'ticker',
+        instId: symbol
+      }))
+    };
+
+    ws.send(JSON.stringify(subscribePayload));
   });
 
-  ws.on('message', (msg) => {
+  ws.on('message', async (message) => {
     try {
-      const data = JSON.parse(msg);
-      if (data.arg?.channel === 'ticker' && data.data?.length) {
-        handleTickerMessage(data);
+      const parsed = JSON.parse(message);
+      if (parsed.arg?.channel === 'ticker' && Array.isArray(parsed.data)) {
+        const tick = parsed.data[0];
+        const symbol = parsed.arg.instId;
+
+        const updatedTicker = {
+          symbol,
+          lastPrice: parseFloat(tick.last),
+          open24h: parseFloat(tick.open24h),
+          high24h: parseFloat(tick.high24h),
+          low24h: parseFloat(tick.low24h),
+          priceChangePercent: parseFloat(tick.changeUtc24h),
+          baseVolume: parseFloat(tick.baseVolume),
+          quoteVolume: parseFloat(tick.quoteVolume),
+        };
+
+        await Ticker.findOneAndUpdate(
+          { symbol },
+          updatedTicker,
+          { upsert: true, new: true }
+        );
+
+        console.log(`💹 Ticker updated for ${symbol}`);
       }
     } catch (err) {
-      console.error('❌ Ticker message parse error:', err.message);
+      console.error('❌ Failed to process ticker message:', err.message);
     }
   });
 
   ws.on('error', (err) => {
-    console.error('❌ Ticker WebSocket error:', err.message);
+    console.error('❌ Bitget Ticker WebSocket error:', err.message);
   });
 
   ws.on('close', () => {
-    console.log('❌ Ticker WebSocket closed. Reconnecting in 5s...');
+    console.warn('⚠️ Bitget Ticker WebSocket closed. Reconnecting in 5s...');
     setTimeout(connectBitgetTickerSocket, 5000);
   });
 }
